@@ -4,12 +4,25 @@ window.World = (() => {
   function create(scene, tex) {
     scene.background = new THREE.Color(0x05060a);
 
-    const hemi = new THREE.HemisphereLight(0xd7eeff, 0x14141c, 0.62);
+    const hemi = new THREE.HemisphereLight(0xd7eeff, 0x14141c, 0.50);
     scene.add(hemi);
 
-    const dir = new THREE.DirectionalLight(0xffffff, 0.55);
+    const dir = new THREE.DirectionalLight(0xbfd4ff, 0.72);
     dir.position.set(35, 70, 25);
+    dir.castShadow = true;
+    dir.shadow.mapSize.width = 1024;
+    dir.shadow.mapSize.height = 1024;
+    dir.shadow.camera.near = 10;
+    dir.shadow.camera.far = 180;
+    dir.shadow.camera.left = -70;
+    dir.shadow.camera.right = 70;
+    dir.shadow.camera.top = 70;
+    dir.shadow.camera.bottom = -70;
     scene.add(dir);
+
+    const moonFill = new THREE.DirectionalLight(0x7da7ff, 0.18);
+    moonFill.position.set(-18, 24, -12);
+    scene.add(moonFill);
 
     const skyGeo = new THREE.SphereGeometry(320, 32, 16);
     const skyMat = new THREE.MeshBasicMaterial({ map: tex.sky, side: THREE.BackSide });
@@ -17,6 +30,19 @@ window.World = (() => {
     scene.add(sky);
 
     const b = Buildings.build(scene, tex);
+
+    const roomLights = [
+      [-24, b.floorY[0] + 3.8, 18, 0xffd7a8, 0.30],
+      [24, b.floorY[0] + 3.8, 8, 0xffe5bb, 0.24],
+      [-24, b.floorY[1] + 3.8, 16, 0xfff0c8, 0.22],
+      [10, b.floorY[1] + 3.8, 3, 0xffddb2, 0.20],
+      [-24, b.floorY[2] + 3.8, 10, 0xffefcf, 0.18],
+    ];
+    for (const [x, y, z, color, intensity] of roomLights) {
+      const point = new THREE.PointLight(color, intensity, 18, 2);
+      point.position.set(x, y, z);
+      scene.add(point);
+    }
 
     function getGroundY(x, feetY, z) {
       const story = Math.max(0, Math.min(b.HOUSE.stories - 1, Math.floor((feetY + 1.0) / b.HOUSE.floorHeight)));

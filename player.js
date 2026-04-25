@@ -40,6 +40,7 @@
       onGround: true,
 
       fireDown: false,
+      triggerPressed: false,
       lastShotAt: -999,
       recoilPitch: 0,
       recoilYaw: 0,
@@ -73,7 +74,10 @@
 
     function bindMouse() {
       lockEl.addEventListener("mousedown", (e) => {
-        if (e.button === 0) state.fireDown = true;
+        if (e.button === 0) {
+          state.fireDown = true;
+          state.triggerPressed = true;
+        }
       });
 
       document.addEventListener("mouseup", (e) => {
@@ -82,6 +86,7 @@
 
       window.addEventListener("blur", () => {
         state.fireDown = false;
+        state.triggerPressed = false;
       });
     }
 
@@ -109,13 +114,13 @@
 
     function updateRecoil(dt) {
       if (state.recoilPitch > 0) {
-        const pitchStep = Math.min(state.recoilPitch, dt * 11.5);
+        const pitchStep = Math.min(state.recoilPitch, dt * 7.5);
         pitchObject.rotation.x = clamp(pitchObject.rotation.x - pitchStep, -Math.PI * 0.48, Math.PI * 0.48);
         state.recoilPitch -= pitchStep;
       }
 
       if (Math.abs(state.recoilYaw) > 0.00001) {
-        const yawStep = state.recoilYaw * Math.min(1, dt * 18);
+        const yawStep = state.recoilYaw * Math.min(1, dt * 10);
         if (yawObject && yawObject.rotation) yawObject.rotation.y += yawStep;
         state.recoilYaw -= yawStep;
       } else {
@@ -124,9 +129,9 @@
     }
 
     function applyRecoil(pitchAmount, yawAmount) {
-      state.recoilPitch = Math.min(0.22, state.recoilPitch + Math.max(0, pitchAmount || 0));
+      state.recoilPitch = Math.min(0.12, state.recoilPitch + Math.max(0, pitchAmount || 0));
       const yawKick = (Math.random() - 0.5) * 2 * Math.max(0, yawAmount || 0);
-      state.recoilYaw = clamp(state.recoilYaw + yawKick, -0.08, 0.08);
+      state.recoilYaw = clamp(state.recoilYaw + yawKick, -0.03, 0.03);
     }
 
     function canFire(nowSeconds, fireRate) {
@@ -141,6 +146,12 @@
 
     function isPrimaryDown() {
       return !!state.fireDown;
+    }
+
+    function consumeTriggerPress() {
+      if (!state.triggerPressed) return false;
+      state.triggerPressed = false;
+      return true;
     }
 
     function step(dt, worldRef) {
@@ -235,6 +246,7 @@
     function resetState() {
       keys.w = keys.a = keys.s = keys.d = keys.shift = keys.space = false;
       state.fireDown = false;
+      state.triggerPressed = false;
       state.lastShotAt = -999;
       state.vel.set(0, 0, 0);
       state.wish.set(0, 0, 0);
@@ -256,6 +268,7 @@
       markFired,
       applyRecoil,
       isPrimaryDown,
+      consumeTriggerPress,
       resetLook,
       resetState,
       consts: { PLAYER_RADIUS, PLAYER_HEIGHT, EYE_HEIGHT }

@@ -50,6 +50,8 @@
       renderer.setSize(window.innerWidth, window.innerHeight);
       renderer.setPixelRatio(Math.min(1.6, window.devicePixelRatio || 1));
       renderer.outputEncoding = THREE.sRGBEncoding;
+      renderer.shadowMap.enabled = true;
+      renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 
       renderer.domElement.style.touchAction = "none";
       renderer.domElement.tabIndex = 0;
@@ -123,8 +125,9 @@
           baseReload: 1.15,
           baseSpread: 0.010,
           pellets: 1,
-          recoilPitch: 0.028,
+          recoilPitch: 0.012,
           recoilYaw: 0.0,
+          automatic: false,
         },
         shotgun: {
           key: "shotgun",
@@ -137,14 +140,16 @@
           baseReload: 1.28,
           baseSpread: 0.085,
           pellets: 7,
-          recoilPitch: 0.056,
+          recoilPitch: 0.026,
           recoilYaw: 0.0,
+          automatic: false,
         },
       };
 
       function createAudio() {
         let ctx = null;
         let unlocked = false;
+        let noiseBuffer = null;
 
         function ensure() {
           if (!ctx) {
@@ -176,15 +181,43 @@
           osc.stop(now + duration + 0.02);
         }
 
+        function ensureNoise(audio) {
+          if (noiseBuffer) return noiseBuffer;
+          const buffer = audio.createBuffer(1, audio.sampleRate * 0.18, audio.sampleRate);
+          const data = buffer.getChannelData(0);
+          for (let i = 0; i < data.length; i++) data[i] = (Math.random() * 2 - 1) * (1 - i / data.length);
+          noiseBuffer = buffer;
+          return noiseBuffer;
+        }
+
+        function noiseBurst(duration, volume, filterFreq, startDelay) {
+          const audio = ensure();
+          if (!audio) return;
+          const now = audio.currentTime + (startDelay || 0);
+          const source = audio.createBufferSource();
+          source.buffer = ensureNoise(audio);
+          const filter = audio.createBiquadFilter();
+          filter.type = "lowpass";
+          filter.frequency.setValueAtTime(filterFreq || 1200, now);
+          const gain = audio.createGain();
+          gain.gain.setValueAtTime(Math.max(0.0001, volume || 0.02), now);
+          gain.gain.exponentialRampToValueAtTime(0.0001, now + duration);
+          source.connect(filter);
+          filter.connect(gain);
+          gain.connect(audio.destination);
+          source.start(now);
+          source.stop(now + duration + 0.02);
+        }
+
         return {
           unlock: () => ensure(),
-          shot: () => { beep(210, 0.05, "square", 0.018, 150); beep(120, 0.06, "triangle", 0.014, 90, 0.01); },
-          reload: () => { beep(520, 0.04, "triangle", 0.015, 430); beep(680, 0.05, "triangle", 0.015, 520, 0.05); },
-          hit: () => beep(420, 0.05, "sawtooth", 0.012, 280),
-          kill: () => { beep(300, 0.05, "triangle", 0.015, 420); beep(520, 0.08, "triangle", 0.013, 720, 0.04); },
-          wave: () => { beep(260, 0.08, "triangle", 0.018, 360); beep(420, 0.10, "triangle", 0.016, 560, 0.08); },
-          gameOver: () => { beep(220, 0.18, "sawtooth", 0.022, 120); beep(140, 0.24, "triangle", 0.018, 80, 0.1); },
-          buy: () => beep(660, 0.06, "triangle", 0.016, 840),
+          shot: () => { noiseBurst(0.05, 0.015, 900); beep(180, 0.045, "triangle", 0.012, 120); },
+          reload: () => { beep(460, 0.03, "sine", 0.012, 380); beep(620, 0.04, "sine", 0.012, 520, 0.04); },
+          hit: () => { noiseBurst(0.03, 0.01, 1500); beep(360, 0.03, "triangle", 0.008, 240); },
+          kill: () => { beep(280, 0.04, "triangle", 0.011, 400); beep(500, 0.06, "triangle", 0.010, 700, 0.03); },
+          wave: () => { beep(220, 0.08, "sine", 0.016, 320); beep(360, 0.10, "sine", 0.014, 520, 0.08); },
+          gameOver: () => { noiseBurst(0.09, 0.012, 700); beep(180, 0.16, "sawtooth", 0.012, 100); beep(130, 0.22, "triangle", 0.010, 80, 0.08); },
+          buy: () => beep(720, 0.05, "sine", 0.012, 920),
         };
       }
       game.audio = createAudio();
@@ -322,6 +355,7 @@
           spread: def.baseSpread,
           recoilPitch: def.recoilPitch,
           recoilYaw: def.recoilYaw,
+          automatic: !!def.automatic,
           ammo: def.baseMag,
           reserve: def.baseReserve,
           reloading: false,
@@ -370,6 +404,7 @@
           w.spread = Math.max(0.004, def.baseSpread * (1 - upgrades.fireRate.level * 0.015));
           w.recoilPitch = def.recoilPitch;
           w.recoilYaw = def.recoilYaw;
+          w.automatic = !!def.automatic;
           w.ammo = Math.min(w.ammo, w.magSize);
           w.reserve = Math.min(w.reserve, w.reserveMax);
         }
@@ -615,8 +650,8 @@
       function computeWave(waveNum) {
         const tier = Math.floor((waveNum - 1) / 5);
         const killsNeeded = 10 + waveNum * 4 + tier * 3;
-        const aliveCap = Math.min(22, 10 + waveNum + tier);
-        const spawnInterval = clamp(0.95 - waveNum * 0.03, 0.35, 0.95);
+        const aliveCap = Math.min(18, 8 + Math.floor(waveNum * 0.75) + tier);
+        const spawnInterval = clamp(1.05 - waveNum * 0.028, 0.48, 1.05);
         const guaranteedTanks = Math.max(0, Math.floor(waveNum / 5));
         const rewardBonus = tier * 2;
         const clearBonus = 12 + waveNum * 2 + tier * 8;
@@ -863,7 +898,9 @@
           if (!game.started || game.shopOpen) return;
           game.audio.unlock();
           if (!game.paused) tryLockCursorFromGesture();
-          spawnBullet();
+          if (game.player && game.player.consumeTriggerPress && game.player.consumeTriggerPress()) {
+            spawnBullet();
+          }
         });
       }
 
@@ -914,6 +951,8 @@
         game.wave.clearBonus = 10;
         game.wave.guaranteedTanks = 0;
         game.wave.spawnedTanks = 0;
+        game.wave.cooldownT = 0;
+        game.wave.cooldown = 3.0;
 
         game.ui.showStart(!startNow);
         game.ui.showShop(false);
@@ -962,7 +1001,7 @@
           game.player.step(dt, game.world);
           updateReload(dt);
           waveSpawnTick(dt);
-          if (game.player.isPrimaryDown()) spawnBullet();
+          if (game.weapon && game.weapon.automatic && game.player.isPrimaryDown()) spawnBullet();
           game.zombies.update(dt, game);
           game.fx.update(dt);
 
