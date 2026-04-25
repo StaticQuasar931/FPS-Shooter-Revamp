@@ -68,6 +68,7 @@
   const tempDir = new THREE.Vector3();
   const tempHead = new THREE.Vector3();
   const tempPlayerEye = new THREE.Vector3();
+  const tempBodyHit = new THREE.Vector3();
 
   function makeZombieMesh(type) {
     const def = TYPE_DEFS[type] || TYPE_DEFS.normal;
@@ -414,7 +415,9 @@
 
         tempClosest.copy(dir).multiplyScalar(t).add(origin);
         const d = tempClosest.distanceTo(tempCenter);
-        if (d > z.radius) continue;
+        const minY = z.mesh.position.y + 0.10;
+        const maxY = z.mesh.position.y + z.height + 0.16;
+        if (d > z.radius || tempClosest.y < minY || tempClosest.y > maxY) continue;
 
         best = z;
         bestT = t;
@@ -517,6 +520,7 @@
         const dx = px - feet.x;
         const dz = pz - feet.z;
         const dist = Math.sqrt(dx * dx + dz * dz) + 0.000001;
+        const verticalGap = Math.abs((pFeet.y + 1.0) - (feet.y + z.height * 0.5));
 
         let wishX = dx / dist;
         let wishZ = dz / dist;
@@ -579,12 +583,12 @@
           z.pushA = Math.random() * Math.PI * 2;
         }
 
-        if (z.type === "spitter" && dist >= z.preferredMin * 0.9 && dist <= z.preferredMax + 2 && z.rangedCooldown <= 0) {
+        if (z.type === "spitter" && verticalGap < 2.4 && dist >= z.preferredMin * 0.9 && dist <= z.preferredMax + 2 && z.rangedCooldown <= 0) {
           spawnSpit(z, pFeet);
           z.rangedCooldown = z.rangedCooldownDelay;
         }
 
-        if (dist <= z.reach && z.meleeCooldown <= 0) {
+        if (verticalGap < 2.2 && dist <= z.reach && z.meleeCooldown <= 0) {
           z.meleeCooldown = (z.type === "tank") ? 0.85 : 0.65;
           game.player.state.hp = Math.max(0, (game.player.state.hp || 0) - z.dmg);
           if (game.ui && game.ui.flashDamage) game.ui.flashDamage();
@@ -594,6 +598,18 @@
       updateProjectiles(dt, game);
     }
 
+    function reset() {
+      for (let i = list.length - 1; i >= 0; i--) {
+        releaseZombie(list[i]);
+      }
+      list.length = 0;
+
+      for (let i = activeSpit.length - 1; i >= 0; i--) {
+        releaseProjectile(activeSpit[i]);
+      }
+      activeSpit.length = 0;
+    }
+
     return {
       list,
       getAliveCount,
@@ -601,6 +617,7 @@
       spawn,
       update,
       damageFromBullet,
+      reset,
     };
   }
 

@@ -8,6 +8,7 @@
     pauseOverlay: document.getElementById("pauseOverlay"),
     resumeBtn: document.getElementById("resumeBtn"),
     shopBtn: document.getElementById("shopBtn"),
+    restartBtn: document.getElementById("restartBtn"),
 
     shopOverlay: document.getElementById("shopOverlay"),
     shopClose: document.getElementById("shopClose"),

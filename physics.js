@@ -77,7 +77,11 @@ window.Physics = (() => {
 
     if (holes && holes.length) {
       for (const h of holes) {
-        if (pointInBox(headP, h)) return;
+        if (
+          headP.x >= h.min.x - radius && headP.x <= h.max.x + radius &&
+          headP.y >= h.min.y && headP.y <= h.max.y &&
+          headP.z >= h.min.z - radius && headP.z <= h.max.z + radius
+        ) return;
       }
     }
 

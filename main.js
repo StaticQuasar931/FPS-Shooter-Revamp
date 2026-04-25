@@ -73,6 +73,7 @@
         started: false,
         paused: true,
         shopOpen: false,
+        gameOver: false,
 
         stats: { kills: 0, coins: 0, coinsPerKill: 8 },
         unlocks: { shotgun: false },
@@ -123,7 +124,7 @@
           baseSpread: 0.010,
           pellets: 1,
           recoilPitch: 0.028,
-          recoilYaw: 0.010,
+          recoilYaw: 0.0,
         },
         shotgun: {
           key: "shotgun",
@@ -137,9 +138,56 @@
           baseSpread: 0.085,
           pellets: 7,
           recoilPitch: 0.056,
-          recoilYaw: 0.018,
+          recoilYaw: 0.0,
         },
       };
+
+      function createAudio() {
+        let ctx = null;
+        let unlocked = false;
+
+        function ensure() {
+          if (!ctx) {
+            const AC = window.AudioContext || window.webkitAudioContext;
+            if (!AC) return null;
+            ctx = new AC();
+          }
+          if (!unlocked && ctx.state === "suspended") {
+            ctx.resume().catch(() => {});
+          }
+          unlocked = true;
+          return ctx;
+        }
+
+        function beep(freq, duration, type, volume, rampTo, startDelay) {
+          const audio = ensure();
+          if (!audio) return;
+          const now = audio.currentTime + (startDelay || 0);
+          const osc = audio.createOscillator();
+          const gain = audio.createGain();
+          osc.type = type || "triangle";
+          osc.frequency.setValueAtTime(freq, now);
+          if (rampTo) osc.frequency.exponentialRampToValueAtTime(Math.max(40, rampTo), now + duration);
+          gain.gain.setValueAtTime(Math.max(0.0001, volume || 0.03), now);
+          gain.gain.exponentialRampToValueAtTime(0.0001, now + duration);
+          osc.connect(gain);
+          gain.connect(audio.destination);
+          osc.start(now);
+          osc.stop(now + duration + 0.02);
+        }
+
+        return {
+          unlock: () => ensure(),
+          shot: () => { beep(210, 0.05, "square", 0.018, 150); beep(120, 0.06, "triangle", 0.014, 90, 0.01); },
+          reload: () => { beep(520, 0.04, "triangle", 0.015, 430); beep(680, 0.05, "triangle", 0.015, 520, 0.05); },
+          hit: () => beep(420, 0.05, "sawtooth", 0.012, 280),
+          kill: () => { beep(300, 0.05, "triangle", 0.015, 420); beep(520, 0.08, "triangle", 0.013, 720, 0.04); },
+          wave: () => { beep(260, 0.08, "triangle", 0.018, 360); beep(420, 0.10, "triangle", 0.016, 560, 0.08); },
+          gameOver: () => { beep(220, 0.18, "sawtooth", 0.022, 120); beep(140, 0.24, "triangle", 0.018, 80, 0.1); },
+          buy: () => beep(660, 0.06, "triangle", 0.016, 840),
+        };
+      }
+      game.audio = createAudio();
 
       function createEffects() {
         const tracerPool = [];
@@ -244,7 +292,20 @@
           }
         }
 
-        return { showTracer, showFlash, update };
+        function reset() {
+          for (const tracer of tracerPool) {
+            tracer.life = 0;
+            tracer.mesh.visible = false;
+            tracer.mesh.material.opacity = 0;
+          }
+          for (const flash of flashPool) {
+            flash.life = 0;
+            flash.mesh.visible = false;
+            flash.mesh.material.opacity = 0;
+          }
+        }
+
+        return { showTracer, showFlash, update, reset };
       }
 
       function makeWeaponState(def) {
@@ -346,13 +407,26 @@
         game.ui.showPause(game.paused);
 
         if (game.paused) {
-          game.ui.setMsg("Paused", reasonText || "Click Resume to continue.");
+          if (game.gameOver) {
+            game.ui.setMsg("Game Over", reasonText || "Restart to try again.");
+            if (game.ui.el.resumeBtn) game.ui.el.resumeBtn.style.display = "none";
+            if (game.ui.el.shopBtn) game.ui.el.shopBtn.style.display = "none";
+            if (game.ui.el.restartBtn) game.ui.el.restartBtn.style.display = "";
+          } else {
+            game.ui.setMsg("Paused", reasonText || "Click Resume to continue.");
+            if (game.ui.el.resumeBtn) game.ui.el.resumeBtn.style.display = "";
+            if (game.ui.el.shopBtn) game.ui.el.shopBtn.style.display = "";
+            if (game.ui.el.restartBtn) game.ui.el.restartBtn.style.display = "none";
+          }
           if (game.player && game.player.controls) {
             try { game.player.controls.unlock(); } catch {}
           }
         } else {
           game.ui.showPause(false);
           game.ui.setMsg("", "");
+          if (game.ui.el.resumeBtn) game.ui.el.resumeBtn.style.display = "";
+          if (game.ui.el.shopBtn) game.ui.el.shopBtn.style.display = "";
+          if (game.ui.el.restartBtn) game.ui.el.restartBtn.style.display = "none";
         }
       }
 
@@ -436,6 +510,7 @@
           w.ammo += take;
           w.reloading = false;
           w.reloadT = 0;
+          if (game.audio) game.audio.reload();
           game.ui.setWaveMsg("Reloaded", 350);
         }
       }
@@ -459,6 +534,7 @@
 
         game.ui.flashCrosshair("kill");
         game.ui.setWaveMsg(`KILL +${gain} coins`, 550);
+        if (game.audio) game.audio.kill();
         if (game.shopOpen) renderShop();
       }
 
@@ -487,6 +563,7 @@
         game.player.markFired(now, w.recoilPitch, w.recoilYaw);
         w.ammo--;
         if (game.ui && game.ui.kickGun) game.ui.kickGun();
+        if (game.audio) game.audio.shot();
 
         camera.getWorldDirection(tempBaseDir);
         tempBaseDir.normalize();
@@ -526,7 +603,10 @@
           tempHitPos.copy(bestHit.dir).multiplyScalar(bestHit.dist).add(tempOrigin);
           spawnFlash(tempHitPos, 0.75, 0.11);
           game.ui.flashCrosshair(bestHit.killed ? "kill" : "hit");
-          if (!bestHit.killed) game.ui.setWaveMsg("HIT", 250);
+          if (!bestHit.killed) {
+            if (game.audio) game.audio.hit();
+            game.ui.setWaveMsg("HIT", 250);
+          }
         }
 
         return true;
@@ -568,6 +648,7 @@
         } else {
           game.ui.setWaveMsg(`Wave ${game.wave.number} started`, 1200);
         }
+        if (game.audio) game.audio.wave();
       }
 
       function endWave() {
@@ -575,6 +656,7 @@
         game.wave.cooldownT = 0;
         game.stats.coins += game.wave.clearBonus;
         game.ui.setWaveMsg(`Wave ${game.wave.number} cleared! +${game.wave.clearBonus} coins`, 1400);
+        if (game.audio) game.audio.wave();
         if (game.shopOpen) renderShop();
         game.wave.number++;
       }
@@ -642,6 +724,7 @@
 
         game.stats.coins -= cost;
         u.level++;
+        if (game.audio) game.audio.buy();
 
         const p = game.player.state;
 
@@ -725,17 +808,12 @@
       }
 
       function hookUIButtons() {
-        const { startBtn, resumeBtn, shopBtn, shopClose, shopRefill } = game.ui.el;
+        const { startBtn, resumeBtn, shopBtn, shopClose, shopRefill, restartBtn } = game.ui.el;
 
         startBtn.addEventListener("click", () => {
           if (!game.ready) return;
-          game.started = true;
-          game.shopOpen = false;
-          game.ui.showStart(false);
-          game.ui.showShop(false);
-          setPaused(false);
-          game.ui.setWaveMsg("WASD move. Click to lock mouse. Survive the wave.", 1500);
-          tryLockCursorFromGesture();
+          game.audio.unlock();
+          resetRun(true);
         });
 
         resumeBtn.addEventListener("click", () => {
@@ -751,6 +829,14 @@
         });
 
         shopClose.addEventListener("click", () => closeShop());
+
+        if (restartBtn) {
+          restartBtn.addEventListener("click", () => {
+            if (!game.ready) return;
+            game.audio.unlock();
+            resetRun(true);
+          });
+        }
 
         shopRefill.addEventListener("click", () => {
           if (!game.weapon) return;
@@ -775,9 +861,71 @@
 
         renderer.domElement.addEventListener("pointerdown", () => {
           if (!game.started || game.shopOpen) return;
+          game.audio.unlock();
           if (!game.paused) tryLockCursorFromGesture();
           spawnBullet();
         });
+      }
+
+      function resetRun(startNow) {
+        game.started = !!startNow;
+        game.paused = !startNow;
+        game.shopOpen = false;
+        game.gameOver = false;
+
+        game.stats.kills = 0;
+        game.stats.coins = 50;
+        game.stats.coinsPerKill = 8;
+
+        game.unlocks.shotgun = false;
+
+        for (const up of Object.values(upgrades)) up.level = 0;
+
+        game.weapons = {};
+        for (const def of Object.values(weaponDefs)) game.weapons[def.key] = makeWeaponState(def);
+        recalcWeapons();
+        setWeapon("pistol");
+
+        if (game.player) {
+          game.player.state.hpMax = 100;
+          game.player.state.hp = 100;
+          game.player.state.staminaMax = 100;
+          game.player.state.stamina = 100;
+          game.player.state.staminaRegen = 22;
+          game.player.resetState();
+
+          const house = game.world.HOUSE;
+          const startZ = house.depth * 0.5 - 7.5;
+          const startFeetY = game.world.getGroundY(0, 0.02, startZ);
+          game.player.setPositionFeet(0, startFeetY, startZ);
+        }
+
+        if (game.zombies && game.zombies.reset) game.zombies.reset();
+        if (game.fx && game.fx.reset) game.fx.reset();
+
+        game.wave.number = 1;
+        game.wave.active = false;
+        game.wave.cooldownT = 0;
+        game.wave.killsDone = 0;
+        game.wave.spawned = 0;
+        game.wave.spawnT = 0;
+        game.wave.killsNeeded = computeWave(1).killsNeeded;
+        game.wave.rewardBonus = 0;
+        game.wave.clearBonus = 10;
+        game.wave.guaranteedTanks = 0;
+        game.wave.spawnedTanks = 0;
+
+        game.ui.showStart(!startNow);
+        game.ui.showShop(false);
+        renderShop();
+
+        if (startNow) {
+          setPaused(false);
+          game.ui.setWaveMsg("WASD move. Click to lock mouse. Survive the wave.", 1500);
+          tryLockCursorFromGesture();
+        } else {
+          setPaused(true, "Loaded. Click Start.");
+        }
       }
 
       function hookPlayerKeys() {
@@ -818,9 +966,11 @@
           game.zombies.update(dt, game);
           game.fx.update(dt);
 
-          if (game.player.state.hp <= 0) {
+          if (game.player.state.hp <= 0 && !game.gameOver) {
             game.player.state.hp = 0;
-            setPaused(true, "GAME OVER. Refresh to restart.");
+            game.gameOver = true;
+            if (game.audio) game.audio.gameOver();
+            setPaused(true, "You died. Click Restart to play again.");
             game.ui.setWaveMsg("GAME OVER", 1200);
           }
         } else if (game.fx) {
@@ -861,22 +1011,10 @@
         const startFeetY = game.world.getGroundY(0, 0.02, startZ);
         game.player.setPositionFeet(0, startFeetY, startZ);
 
-        game.stats.coins = 50;
-        game.stats.coinsPerKill = 8;
-
-        game.wave.number = 1;
-        game.wave.active = false;
-        game.wave.cooldownT = 0;
-        game.wave.killsDone = 0;
-        game.wave.killsNeeded = computeWave(game.wave.number).killsNeeded;
-
         game.ready = true;
         game.ui.el.startBtn.disabled = false;
         game.ui.el.startBtn.textContent = "Click to Start";
-        game.ui.setGunImage(game.weapon.icon);
-        game.ui.updateHUD(game);
-
-        setPaused(true, "Loaded. Click Start.");
+        resetRun(false);
         animate();
       }
 

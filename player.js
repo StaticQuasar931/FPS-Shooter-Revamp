@@ -18,6 +18,7 @@
     const lockEl = domElement || document.body;
     const controls = new THREE.PointerLockControls(camera, lockEl);
     const yawObject = controls.getObject ? controls.getObject() : null;
+    const pitchObject = camera.parent || camera;
 
     const feet = new THREE.Vector3(0, 0.02, 0);
     const forward = new THREE.Vector3();
@@ -109,7 +110,7 @@
     function updateRecoil(dt) {
       if (state.recoilPitch > 0) {
         const pitchStep = Math.min(state.recoilPitch, dt * 11.5);
-        camera.rotation.x = clamp(camera.rotation.x - pitchStep, -Math.PI * 0.48, Math.PI * 0.48);
+        pitchObject.rotation.x = clamp(pitchObject.rotation.x - pitchStep, -Math.PI * 0.48, Math.PI * 0.48);
         state.recoilPitch -= pitchStep;
       }
 
@@ -224,6 +225,23 @@
       return camera.position.clone();
     }
 
+    function resetLook() {
+      if (yawObject && yawObject.rotation) yawObject.rotation.y = 0;
+      if (pitchObject && pitchObject.rotation) pitchObject.rotation.x = 0;
+      state.recoilPitch = 0;
+      state.recoilYaw = 0;
+    }
+
+    function resetState() {
+      keys.w = keys.a = keys.s = keys.d = keys.shift = keys.space = false;
+      state.fireDown = false;
+      state.lastShotAt = -999;
+      state.vel.set(0, 0, 0);
+      state.wish.set(0, 0, 0);
+      state.onGround = true;
+      resetLook();
+    }
+
     bindMouse();
 
     return {
@@ -238,6 +256,8 @@
       markFired,
       applyRecoil,
       isPrimaryDown,
+      resetLook,
+      resetState,
       consts: { PLAYER_RADIUS, PLAYER_HEIGHT, EYE_HEIGHT }
     };
   }
