@@ -1,0 +1,493 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>StaticQuasar931 Zombie House Waves</title>
+
+  <style>
+    html, body { margin:0; padding:0; width:100%; height:100%; overflow:hidden; background:#0b0f14; }
+    canvas { display:block; }
+
+    #bootError{
+      position:fixed; left:12px; right:12px; bottom:12px;
+      padding:12px 14px; border-radius:14px;
+      background: rgba(0,0,0,.55);
+      border:1px solid rgba(255,255,255,.18);
+      color:#eaf2ff; font: 12px/1.35 ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+      white-space:pre-wrap;
+      display:none;
+      z-index: 99999;
+      backdrop-filter: blur(10px);
+    }
+
+    #startOverlay{
+      position:fixed; inset:0; display:grid; place-items:center; z-index:9999;
+      background: radial-gradient(1200px 700px at 50% 40%, rgba(40,60,90,.75), rgba(0,0,0,.92));
+      font-family: Arial, sans-serif; color:#eaf2ff; user-select:none;
+    }
+    #startCard{
+      width:min(760px, 92vw);
+      border-radius:18px;
+      background: rgba(10,16,26,.72);
+      box-shadow:0 12px 40px rgba(0,0,0,.55);
+      border:1px solid rgba(255,255,255,.12);
+      padding:18px 18px 16px;
+      backdrop-filter: blur(10px);
+    }
+    #startTitle{ display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:10px; }
+    #startTitle h1{ font-size:18px; margin:0; letter-spacing:.4px; }
+    #startTitle .tag{
+      font-size:12px; opacity:.9;
+      padding:6px 10px; border-radius:999px;
+      background: rgba(120,180,255,.16);
+      border:1px solid rgba(120,180,255,.25);
+    }
+    #startBody{ display:grid; grid-template-columns: 1.1fr .9fr; gap:14px; }
+    @media (max-width: 760px){ #startBody{ grid-template-columns:1fr; } }
+
+    .panel{
+      border-radius:14px;
+      padding:12px;
+      background: rgba(0,0,0,.22);
+      border:1px solid rgba(255,255,255,.10);
+    }
+    .panel h2{ font-size:14px; margin:0 0 8px; opacity:.95; }
+    .panel ul{ margin:0; padding-left:18px; font-size:13px; opacity:.92; line-height:1.35; }
+    .panel li{ margin:6px 0; }
+
+    .kbd{
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+      font-size:12px; padding:2px 6px; border-radius:6px;
+      background: rgba(255,255,255,.10);
+      border:1px solid rgba(255,255,255,.14);
+      white-space:nowrap;
+    }
+
+    #startFooter{ margin-top:12px; display:flex; gap:10px; align-items:center; justify-content:space-between; flex-wrap:wrap; }
+    #startBtn{
+      appearance:none; border:none;
+      padding:12px 16px;
+      border-radius:14px;
+      font-size:14px; font-weight:800;
+      cursor:pointer;
+      color:#06101d;
+      background: linear-gradient(135deg, #8be7ff, #b1ffdf);
+      box-shadow: 0 10px 20px rgba(0,0,0,.35);
+      transition: transform .08s ease, filter .12s ease;
+    }
+    #startBtn:hover{ filter: brightness(1.02); }
+    #startBtn:active{ transform: translateY(1px) scale(.99); }
+    #startBtn[disabled]{ opacity:.55; cursor:not-allowed; }
+    #startNote{ font-size:12px; opacity:.86; max-width:520px; line-height:1.35; }
+    #startNote b{ opacity:1; }
+
+    #hud{ position:fixed; inset:0; pointer-events:none; z-index:9000; font-family: Arial, sans-serif; color:#eaf2ff; }
+    #crosshair{
+      position:absolute; left:50%; top:50%;
+      width:18px; height:18px;
+      transform: translate(-50%,-50%);
+      opacity:.85;
+    }
+    #crosshair:before, #crosshair:after{
+      content:""; position:absolute; left:50%; top:50%;
+      background: rgba(255,255,255,.9);
+      transform: translate(-50%,-50%);
+      border-radius:1px;
+    }
+    #crosshair:before{ width:2px; height:18px; }
+    #crosshair:after{ width:18px; height:2px; }
+
+    #bottomLeft{
+      position:absolute; left:14px; bottom:14px; width:240px;
+      display:flex; flex-direction:column; gap:10px;
+    }
+    .barWrap{
+      border-radius:12px; padding:10px;
+      background: rgba(0,0,0,.35);
+      border:1px solid rgba(255,255,255,.14);
+      backdrop-filter: blur(8px);
+      box-shadow: 0 10px 22px rgba(0,0,0,.35);
+    }
+    .barRow{ display:flex; justify-content:space-between; align-items:center; margin-bottom:8px; }
+    .barRow span{ font-size:12px; opacity:.92; }
+    .bar{
+      height:12px; border-radius:999px; overflow:hidden;
+      background: rgba(255,255,255,.10);
+      border:1px solid rgba(255,255,255,.12);
+    }
+    .bar > i{
+      display:block; height:100%; width:100%;
+      border-radius:999px;
+      background: linear-gradient(90deg, rgba(255,120,120,.95), rgba(255,205,120,.95));
+      transition: width .12s ease;
+    }
+    .bar.stam > i{
+      background: linear-gradient(90deg, rgba(120,255,220,.95), rgba(120,180,255,.95));
+    }
+
+    #ammoCoins{
+      position:absolute; left:14px; bottom:140px;
+      padding:10px 12px; min-width:260px;
+      border-radius:12px;
+      background: rgba(0,0,0,.35);
+      border:1px solid rgba(255,255,255,.14);
+      backdrop-filter: blur(8px);
+      box-shadow: 0 10px 22px rgba(0,0,0,.35);
+      font-size:12px; line-height:1.35;
+      pointer-events:none;
+    }
+    #weaponCard{
+      display:grid;
+      grid-template-columns: 52px 1fr;
+      gap:10px;
+      align-items:center;
+      transform-origin:left bottom;
+      transition: transform .08s ease, filter .08s ease;
+    }
+    #weaponCard.kick{
+      transform: translateY(2px) scale(.985);
+      filter: brightness(1.08);
+    }
+    #uiWeaponArt{
+      width:48px; height:48px;
+      object-fit:contain;
+      image-rendering:auto;
+      opacity:0;
+      transition: opacity .12s ease;
+    }
+    #weaponMeta .name{
+      font-size:13px;
+      font-weight:700;
+      margin-bottom:3px;
+    }
+    #uiUpgradeInfo{
+      margin-top:5px;
+      opacity:.82;
+      font-size:11px;
+      letter-spacing:.2px;
+    }
+
+    #waveTop{
+      position:absolute; left:50%; top:12px;
+      transform: translateX(-50%);
+      width:min(620px, 92vw);
+      border-radius:14px;
+      background: rgba(0,0,0,.32);
+      border:1px solid rgba(255,255,255,.14);
+      backdrop-filter: blur(10px);
+      box-shadow: 0 12px 26px rgba(0,0,0,.35);
+      padding:10px 12px 12px;
+      pointer-events:none;
+    }
+    #waveLabels{ display:flex; justify-content:space-between; align-items:center; font-size:12px; opacity:.92; margin-bottom:8px; }
+    #waveLabels b{ font-size:12px; opacity:1; }
+    #waveBar{
+      height:12px; border-radius:999px; overflow:hidden;
+      background: rgba(255,255,255,.10);
+      border:1px solid rgba(255,255,255,.12);
+      position:relative;
+    }
+    #waveFill{
+      height:100%; width:0%;
+      border-radius:999px;
+      background: linear-gradient(90deg, rgba(255,240,140,.95), rgba(120,255,220,.95));
+      transition: width .18s ease;
+    }
+    #wavePulse{
+      position:absolute; inset:0;
+      background: radial-gradient(120px 10px at 20% 50%, rgba(255,255,255,.22), transparent);
+      animation: wavePulse 1.6s linear infinite;
+      mix-blend-mode: screen;
+      opacity:.55;
+    }
+    @keyframes wavePulse{
+      0% { transform: translateX(-30%); }
+      100% { transform: translateX(130%); }
+    }
+    #waveMsg{ margin-top:8px; font-size:12px; opacity:.92; text-align:center; min-height:16px; }
+
+    #topRight{
+      position:absolute; right:14px; top:14px;
+      width:200px;
+      border-radius:14px;
+      background: rgba(0,0,0,.32);
+      border:1px solid rgba(255,255,255,.14);
+      backdrop-filter: blur(10px);
+      box-shadow: 0 12px 26px rgba(0,0,0,.35);
+      padding:10px 12px;
+      pointer-events:none;
+    }
+    #topRight .row{ display:flex; justify-content:space-between; gap:10px; font-size:12px; margin:5px 0; }
+    #topRight .row span{ opacity:.92; }
+    #topRight .row b{ opacity:1; }
+
+    #pauseOverlay{
+      position:fixed; inset:0; display:none; place-items:center; z-index:9500;
+      background: rgba(0,0,0,.55);
+      font-family: Arial, sans-serif; color:#eaf2ff;
+      user-select:none;
+    }
+    #pauseCard{
+      width:min(560px, 92vw);
+      border-radius:18px;
+      background: rgba(10,16,26,.78);
+      border:1px solid rgba(255,255,255,.14);
+      box-shadow: 0 18px 60px rgba(0,0,0,.55);
+      backdrop-filter: blur(12px);
+      padding:14px;
+    }
+    #pauseCard h2{ margin:0 0 8px; font-size:16px; }
+    #pauseCard p{ margin:0 0 12px; font-size:12px; opacity:.9; line-height:1.35; }
+    .rowBtns{ display:flex; gap:10px; flex-wrap:wrap; }
+    .btn{
+      pointer-events:auto;
+      appearance:none; border:none; cursor:pointer;
+      padding:10px 12px; border-radius:12px;
+      font-weight:900; font-size:12px;
+      color:#06101d;
+      background: linear-gradient(135deg, #8be7ff, #b1ffdf);
+      box-shadow: 0 10px 20px rgba(0,0,0,.35);
+    }
+    .btn.secondary{
+      color:#eaf2ff;
+      background: rgba(255,255,255,.10);
+      border:1px solid rgba(255,255,255,.14);
+      box-shadow:none;
+    }
+
+    #shopOverlay{
+      position:fixed; inset:0; display:none; place-items:center; z-index:9600;
+      background: rgba(0,0,0,.55);
+      font-family: Arial, sans-serif; color:#eaf2ff;
+    }
+    #shopCard{
+      width:min(900px, 94vw);
+      max-height:min(78vh, 640px);
+      overflow:hidden;
+      border-radius:18px;
+      background: rgba(10,16,26,.78);
+      border:1px solid rgba(255,255,255,.14);
+      box-shadow: 0 18px 60px rgba(0,0,0,.55);
+      backdrop-filter: blur(12px);
+      display:grid;
+      grid-template-rows: auto 1fr auto;
+    }
+    #shopHeader{
+      padding:12px 14px;
+      display:flex; align-items:center; justify-content:space-between; gap:12px;
+      border-bottom:1px solid rgba(255,255,255,.12);
+    }
+    #shopHeader h2{ margin:0; font-size:15px; letter-spacing:.3px; }
+    #shopHeader .hint{ font-size:12px; opacity:.85; }
+    #shopHeader .btns{ display:flex; gap:8px; align-items:center; }
+
+    #shopBody{
+      overflow:auto;
+      padding:14px;
+      display:grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap:12px;
+    }
+    @media (max-width: 860px){ #shopBody{ grid-template-columns:1fr; } }
+
+    .card{
+      border-radius:14px;
+      background: rgba(0,0,0,.22);
+      border:1px solid rgba(255,255,255,.10);
+      padding:12px;
+    }
+    .card h3{
+      margin:0 0 10px;
+      font-size:13px; opacity:.95;
+      display:flex; justify-content:space-between; gap:10px;
+    }
+    .item{
+      display:grid;
+      grid-template-columns: 1fr auto;
+      gap:10px;
+      padding:10px 10px;
+      border-radius:12px;
+      background: rgba(255,255,255,.06);
+      border:1px solid rgba(255,255,255,.10);
+      margin:8px 0;
+      align-items:center;
+    }
+    .item .meta{ font-size:12px; opacity:.92; line-height:1.25; }
+    .item .meta b{ opacity:1; }
+    .item .meta small{ display:block; opacity:.8; margin-top:4px; }
+    .buy{
+      pointer-events:auto;
+      padding:9px 10px;
+      border-radius:12px;
+      border:1px solid rgba(255,255,255,.16);
+      background: rgba(0,0,0,.25);
+      color:#eaf2ff;
+      cursor:pointer;
+      font-weight:900;
+      font-size:12px;
+      min-width:92px;
+      text-align:center;
+    }
+    .buy:hover{ background: rgba(255,255,255,.10); }
+    .buy[disabled]{ opacity:.45; cursor:not-allowed; }
+
+    #shopFooter{
+      padding:12px 14px;
+      border-top:1px solid rgba(255,255,255,.12);
+      display:flex; justify-content:space-between; gap:10px; align-items:center; flex-wrap:wrap;
+      font-size:12px; opacity:.92;
+    }
+  </style>
+
+  <script src="https://cdn.jsdelivr.net/npm/three@0.118.3/build/three.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/three@0.118.3/examples/js/controls/PointerLockControls.js"></script>
+
+  <script>
+    (function () {
+      function show(msg) {
+        const box = document.getElementById("bootError");
+        if (!box) return;
+        box.style.display = "block";
+        box.textContent = msg;
+      }
+      window.addEventListener("error", (e) => {
+        if (e && e.target && e.target.tagName === "SCRIPT") {
+          const src = e.target.getAttribute("src") || "(unknown src)";
+          show(
+            "BOOT ERROR:\nFailed to load script:\n" + src + "\n\nFix:\n- Make sure the file exists in the SAME folder as index.html\n- Do not rename files\n- Neocities is case-sensitive\n- Keep all scripts as classic scripts, not modules"
+          );
+        }
+      }, true);
+    })();
+  </script>
+
+  <!-- Game files (classic scripts). Order matters. -->
+  <script defer src="./assets.js?v=3"></script>
+  <script defer src="./physics.js?v=3"></script>
+  <script defer src="./ui.js?v=3"></script>
+  <script defer src="./buildings.js?v=3"></script>
+  <script defer src="./world.js?v=3"></script>
+  <script defer src="./player.js?v=3"></script>
+  <script defer src="./zombies.js?v=3"></script>
+  <script defer src="./main.js?v=3"></script>
+</head>
+
+<body>
+  <div id="bootError"></div>
+
+  <div id="startOverlay">
+    <div id="startCard">
+      <div id="startTitle">
+        <h1>Zombie House Waves (3 Stories) | StaticQuasar931</h1>
+        <div class="tag">Arcade Waves + Shop</div>
+      </div>
+      <div id="startBody">
+        <div class="panel">
+          <h2>Controls</h2>
+          <ul>
+            <li><span class="kbd">WASD</span> move, <span class="kbd">Mouse</span> aim</li>
+            <li><span class="kbd">Left Click</span> shoot</li>
+            <li><span class="kbd">Shift</span> run (uses stamina)</li>
+            <li><span class="kbd">Space</span> jump</li>
+            <li><span class="kbd">R</span> reload</li>
+            <li><span class="kbd">F</span> shop toggle, <span class="kbd">Esc</span> pause or close shop</li>
+          </ul>
+        </div>
+        <div class="panel">
+          <h2>Notes</h2>
+          <ul>
+            <li>Click Start. Your mouse will lock into the game.</li>
+            <li>If you tab out, the game pauses. Click Resume to continue.</li>
+            <li>Run with a local server for testing.</li>
+          </ul>
+        </div>
+      </div>
+      <div id="startFooter">
+        <button id="startBtn" disabled>Loading...</button>
+        <div id="startNote">
+          If textures do not load locally, use <b>python -m http.server</b> and open <b>http://localhost:8000</b>.
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div id="hud" aria-hidden="true">
+    <div id="crosshair"></div>
+
+    <div id="waveTop">
+      <div id="waveLabels">
+        <div><b id="waveLeft">Wave 1</b> <span style="opacity:.8">progress</span></div>
+        <div><span id="waveRight" style="opacity:.9">Wave 2</span></div>
+      </div>
+      <div id="waveBar">
+        <div id="waveFill"></div>
+        <div id="wavePulse"></div>
+      </div>
+      <div id="waveMsg"></div>
+    </div>
+
+    <div id="topRight">
+      <div class="row"><span>Wave</span><b id="uiWave">1</b></div>
+      <div class="row"><span>Alive</span><b id="uiAlive">0</b></div>
+      <div class="row"><span>Kills</span><b id="uiKills">0</b></div>
+      <div class="row"><span>Coins</span><b id="uiCoins">0</b></div>
+    </div>
+
+    <div id="ammoCoins">
+      <div id="weaponCard">
+        <img id="uiWeaponArt" alt="Current weapon" />
+        <div id="weaponMeta">
+          <div class="name"><b>Weapon</b>: <span id="uiWeapon">Pistol</span></div>
+          <div><b>Ammo</b>: <span id="uiAmmo">12</span> / <span id="uiAmmoMax">12</span> (reserve <span id="uiReserve">36</span>)</div>
+          <div><b>Damage</b>: <span id="uiDmg">20</span> | <b>Fire Rate</b>: <span id="uiRate">6.0</span>/s</div>
+          <div id="uiUpgradeInfo">Lv Dmg 0 | Rate 0 | Ammo 0</div>
+        </div>
+      </div>
+    </div>
+
+    <div id="bottomLeft">
+      <div class="barWrap">
+        <div class="barRow"><span>HP</span><span id="hpText">100 / 100</span></div>
+        <div class="bar"><i id="hpFill" style="width:100%"></i></div>
+      </div>
+      <div class="barWrap">
+        <div class="barRow"><span>Stamina</span><span id="stamText">100 / 100</span></div>
+        <div class="bar stam"><i id="stamFill" style="width:100%"></i></div>
+      </div>
+    </div>
+  </div>
+
+  <div id="pauseOverlay">
+    <div id="pauseCard">
+      <h2 id="pauseTitle">Paused</h2>
+      <p id="pauseText">Click Resume to continue.</p>
+      <div class="rowBtns">
+        <button class="btn" id="resumeBtn">Resume</button>
+        <button class="btn secondary" id="shopBtn">Shop</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="shopOverlay" role="dialog" aria-modal="true">
+    <div id="shopCard">
+      <div id="shopHeader">
+        <div>
+          <h2>Shop</h2>
+          <div class="hint">Press <span class="kbd">F</span> or <span class="kbd">Esc</span> to close</div>
+        </div>
+        <div class="btns">
+          <button class="btn secondary" id="shopClose">Close</button>
+          <button class="btn" id="shopRefill">Refill Ammo</button>
+        </div>
+      </div>
+      <div id="shopBody"></div>
+      <div id="shopFooter">
+        <div><b>Coins:</b> <span id="shopCoins">0</span></div>
+        <div style="opacity:.85">Upgrades have levels. Buy again to level up until max.</div>
+      </div>
+    </div>
+  </div>
+</body>
+</html>
+<!-- index.html -->
