@@ -166,8 +166,8 @@ window.Buildings = (() => {
       boxMesh(hole.x + hole.w * 0.5 + frameThick * 0.5, y, hole.z, frameThick, 0.22, hole.d + 1.0, matTrim, false, true);
     }
 
-    const stairA = { x: 11, z: 6.5, w: 9.2, d: 15.0 };
-    const stairB = { x: -11, z: -8.0, w: 9.2, d: 15.0 };
+    const stairA = { x: 10.5, z: 2.0, w: 8.2, d: 14.0 };
+    const stairB = { x: 10.5, z: 2.0, w: 8.2, d: 14.0 };
 
     ceilingWithHole(HOUSE.wallH + floorY[0], stairA);
     ceilingWithHole(HOUSE.wallH + floorY[1], stairB);
@@ -310,14 +310,14 @@ window.Buildings = (() => {
     function makeStairRamp(cx, cz, fromStory, toStory, hole) {
       const yBase = floorY[fromStory];
       const yTop = floorY[toStory];
-      const run = 14.0;
-      const width = 6.8;
+      const run = 12.4;
+      const width = 6.2;
       const stepCount = 18;
       const rise = (yTop - yBase) / stepCount;
       const tread = run / stepCount;
       const stairMat = new THREE.MeshStandardMaterial({ color: 0x7a6f63, roughness: 0.9 });
 
-      const zStart = cz + 5.2;
+      const zStart = cz + 4.9;
       for (let i = 0; i < stepCount; i++) {
         const h = Math.max(0.10, rise * 0.95);
         const y = yBase + i * rise;
@@ -335,7 +335,7 @@ window.Buildings = (() => {
       addAABB(solids, cx - width * 0.5 - 0.24, railHeight, zStart - run + 0.3, cx - width * 0.5 - 0.02, yTop + 0.9, zStart + 0.7, "railL");
       addAABB(solids, cx + width * 0.5 + 0.02, railHeight, zStart - run + 0.3, cx + width * 0.5 + 0.24, yTop + 0.9, zStart + 0.7, "railR");
 
-      boxMesh(cx, yTop, zStart - run + 0.5, width + 1.2, 0.42, 5.2, matStone);
+      boxMesh(cx, yTop, zStart - run + 0.75, width + 1.4, 0.42, 5.6, matStone);
 
       if (hole) {
         addAABB(solids, hole.x - hole.w * 0.5, yBase, hole.z - hole.d * 0.5, hole.x - hole.w * 0.5 + 0.28, yBase + 1.0, hole.z + hole.d * 0.5, "holeRailW");
@@ -446,23 +446,25 @@ window.Buildings = (() => {
       scene.add(s);
     }
 
-    couch(-26, floorY[0], 18, Math.PI * 0.5);
-    table(-22, floorY[0], 6, 0);
-    counter(-28, floorY[0], -18, 0);
-    bookshelf(28, floorY[0], 18, Math.PI);
-    lamp(24, floorY[0], 8);
+    couch(-24, floorY[0], 24.1, Math.PI);
+    table(-24, floorY[0], 18.2, 0);
+    bookshelf(-37.0, floorY[0], 19.0, Math.PI * 0.5);
+    counter(-28, floorY[0], -20.5, 0);
+    lamp(-17.0, floorY[0], 22.0);
 
-    bookshelf(-28, floorY[1], 16, Math.PI * 0.5);
-    table(24, floorY[1], -12, Math.PI);
-    couch(26, floorY[1], 20, Math.PI);
-    lamp(10, floorY[1], 3);
+    bookshelf(-37.0, floorY[1], 16.0, Math.PI * 0.5);
+    couch(24.0, floorY[1], 24.0, Math.PI);
+    table(24.0, floorY[1], 18.4, 0);
+    lamp(17.5, floorY[1], 22.0);
 
-    lamp(-24, floorY[2], 10);
-    couch(-24, floorY[2], -18, 0);
-    bookshelf(24, floorY[2], 18, Math.PI);
+    couch(-24.0, floorY[2], -24.0, 0);
+    table(-24.0, floorY[2], -18.2, 0);
+    bookshelf(-37.0, floorY[2], -18.0, Math.PI * 0.5);
+    lamp(-17.5, floorY[2], -22.0);
 
-    tvScreen(14, floorY[0], 18, Math.PI);
-    tvScreen(20, floorY[1], -20, Math.PI);
+    tvScreen(-24.0, floorY[0], 12.55, 0);
+    tvScreen(24.0, floorY[1], 10.55, 0);
+    tvScreen(-24.0, floorY[2], -12.55, Math.PI);
 
     function addSpawn(x, z, story, w = 1.0) {
       spawnPoints.push({ x, z, story, w });

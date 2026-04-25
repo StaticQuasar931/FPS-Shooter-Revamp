@@ -119,19 +119,12 @@
         state.recoilPitch -= pitchStep;
       }
 
-      if (Math.abs(state.recoilYaw) > 0.00001) {
-        const yawStep = state.recoilYaw * Math.min(1, dt * 10);
-        if (yawObject && yawObject.rotation) yawObject.rotation.y += yawStep;
-        state.recoilYaw -= yawStep;
-      } else {
-        state.recoilYaw = 0;
-      }
+      state.recoilYaw = 0;
     }
 
     function applyRecoil(pitchAmount, yawAmount) {
       state.recoilPitch = Math.min(0.12, state.recoilPitch + Math.max(0, pitchAmount || 0));
-      const yawKick = (Math.random() - 0.5) * 2 * Math.max(0, yawAmount || 0);
-      state.recoilYaw = clamp(state.recoilYaw + yawKick, -0.03, 0.03);
+      state.recoilYaw = 0;
     }
 
     function canFire(nowSeconds, fireRate) {
