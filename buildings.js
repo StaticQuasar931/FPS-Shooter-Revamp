@@ -43,6 +43,8 @@ window.Buildings = (() => {
 
     const halfW = HOUSE.width * 0.5;
     const halfD = HOUSE.depth * 0.5;
+    const t = HOUSE.wallT;
+
     const bounds = {
       minX: -halfW + 2.1,
       maxX: halfW - 2.1,
@@ -53,21 +55,24 @@ window.Buildings = (() => {
     const floorY = [];
     for (let s = 0; s < HOUSE.stories; s++) floorY[s] = s * HOUSE.floorHeight;
 
-    tex.floorWood.repeat.set(9, 7);
-    tex.carpet.repeat.set(9, 7);
-    tex.ceiling.repeat.set(9, 7);
+    tex.floorWood.repeat.set(8, 6);
+    tex.carpet.repeat.set(8, 6);
+    tex.ceiling.repeat.set(8, 6);
 
-    const matFloor0 = new THREE.MeshStandardMaterial({ map: tex.floorWood, roughness: 0.95, metalness: 0.02 });
-    const matFloor1 = new THREE.MeshStandardMaterial({ map: tex.carpet, roughness: 1.0, metalness: 0.0 });
-    const matFloor2 = new THREE.MeshStandardMaterial({ map: tex.floorWood, roughness: 0.95, metalness: 0.02 });
+    const matFloor0 = new THREE.MeshStandardMaterial({ map: tex.floorWood, roughness: 0.92, metalness: 0.02 });
+    const matFloor1 = new THREE.MeshStandardMaterial({ map: tex.carpet, roughness: 0.98, metalness: 0.0 });
+    const matFloor2 = new THREE.MeshStandardMaterial({ map: tex.floorWood, roughness: 0.9, metalness: 0.02 });
     const matCeil = new THREE.MeshStandardMaterial({ map: tex.ceiling, roughness: 0.95, metalness: 0.0 });
-    const matWall = new THREE.MeshStandardMaterial({ color: 0xdcd7cf, roughness: 0.96, metalness: 0.0 });
-    const matTrim = new THREE.MeshStandardMaterial({ color: 0xb9b2a7, roughness: 0.92, metalness: 0.0 });
-    const matStone = new THREE.MeshStandardMaterial({ color: 0x6b6b6b, roughness: 0.98, metalness: 0.0 });
-    const matWood = new THREE.MeshStandardMaterial({ color: 0x72533a, roughness: 0.9, metalness: 0.02 });
-    const matDarkWood = new THREE.MeshStandardMaterial({ color: 0x4d3624, roughness: 0.92, metalness: 0.01 });
-    const matFabric = new THREE.MeshStandardMaterial({ color: 0x48586f, roughness: 0.97, metalness: 0.0 });
-    const matLamp = new THREE.MeshStandardMaterial({ color: 0xe8d7a3, emissive: 0x261d10, emissiveIntensity: 0.35, roughness: 0.7 });
+    const matWall = new THREE.MeshStandardMaterial({ color: 0xd9d5cd, roughness: 0.96, metalness: 0.0 });
+    const matTrim = new THREE.MeshStandardMaterial({ color: 0xb4ad9f, roughness: 0.88, metalness: 0.02 });
+    const matStone = new THREE.MeshStandardMaterial({ color: 0x6a6a6a, roughness: 0.98, metalness: 0.0 });
+    const matWood = new THREE.MeshStandardMaterial({ color: 0x76563b, roughness: 0.90, metalness: 0.02 });
+    const matDarkWood = new THREE.MeshStandardMaterial({ color: 0x503725, roughness: 0.92, metalness: 0.01 });
+    const matFabric = new THREE.MeshStandardMaterial({ color: 0x4b5a6d, roughness: 0.97, metalness: 0.0 });
+    const matLamp = new THREE.MeshStandardMaterial({ color: 0xefddb1, emissive: 0x261d10, emissiveIntensity: 0.32, roughness: 0.72 });
+
+    const hall = { minX: -5.2, maxX: 5.2, minZ: -halfD + 2.8, maxZ: halfD - 2.8 };
+    const stair = { x: 17.5, z: 2.0, width: 8.4, depth: 14.0 };
 
     function boxMesh(x, y, z, w, h, d, mat, cast = true, receive = true) {
       const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat);
@@ -78,11 +83,21 @@ window.Buildings = (() => {
       return m;
     }
 
-    function cylMesh(x, y, z, rTop, rBottom, h, mat, cast = true, receive = true) {
+    function planeMesh(w, h, x, y, z, rotY, mat) {
+      const m = new THREE.Mesh(new THREE.PlaneGeometry(w, h), mat);
+      m.position.set(x, y, z);
+      m.rotation.y = rotY || 0;
+      m.castShadow = true;
+      m.receiveShadow = true;
+      scene.add(m);
+      return m;
+    }
+
+    function cylMesh(x, y, z, rTop, rBottom, h, mat) {
       const m = new THREE.Mesh(new THREE.CylinderGeometry(rTop, rBottom, h, 16), mat);
       m.position.set(x, y + h * 0.5, z);
-      m.castShadow = cast;
-      m.receiveShadow = receive;
+      m.castShadow = true;
+      m.receiveShadow = true;
       scene.add(m);
       return m;
     }
@@ -98,43 +113,39 @@ window.Buildings = (() => {
     floorSlab(floorY[1], matFloor1);
     floorSlab(floorY[2], matFloor2);
 
-    function exteriorWallsForStory(baseY, hasEntry) {
-      const entryW = 12.0;
-      const sideW = (HOUSE.width - entryW) * 0.5;
+    function outerShell(baseY, frontDoor) {
+      const doorW = 11.5;
+      const sideW = (HOUSE.width - doorW) * 0.5;
 
-      boxMesh(0, baseY, -halfD + HOUSE.wallT * 0.5, HOUSE.width, HOUSE.wallH, HOUSE.wallT, matWall);
-      addAABB(solids, -halfW, baseY, -halfD, halfW, baseY + HOUSE.wallH, -halfD + HOUSE.wallT, "wallN");
+      boxMesh(0, baseY, -halfD + t * 0.5, HOUSE.width, HOUSE.wallH, t, matWall);
+      addAABB(solids, -halfW, baseY, -halfD, halfW, baseY + HOUSE.wallH, -halfD + t, "northWall");
 
-      boxMesh(-halfW + HOUSE.wallT * 0.5, baseY, 0, HOUSE.wallT, HOUSE.wallH, HOUSE.depth, matWall);
-      addAABB(solids, -halfW, baseY, -halfD, -halfW + HOUSE.wallT, baseY + HOUSE.wallH, halfD, "wallW");
+      boxMesh(-halfW + t * 0.5, baseY, 0, t, HOUSE.wallH, HOUSE.depth, matWall);
+      addAABB(solids, -halfW, baseY, -halfD, -halfW + t, baseY + HOUSE.wallH, halfD, "westWall");
 
-      boxMesh(halfW - HOUSE.wallT * 0.5, baseY, 0, HOUSE.wallT, HOUSE.wallH, HOUSE.depth, matWall);
-      addAABB(solids, halfW - HOUSE.wallT, baseY, -halfD, halfW, baseY + HOUSE.wallH, halfD, "wallE");
+      boxMesh(halfW - t * 0.5, baseY, 0, t, HOUSE.wallH, HOUSE.depth, matWall);
+      addAABB(solids, halfW - t, baseY, -halfD, halfW, baseY + HOUSE.wallH, halfD, "eastWall");
 
-      if (hasEntry) {
-        boxMesh(-(entryW * 0.5 + sideW * 0.5), baseY, halfD - HOUSE.wallT * 0.5, sideW, HOUSE.wallH, HOUSE.wallT, matWall);
-        addAABB(solids, -(entryW * 0.5 + sideW), baseY, halfD - HOUSE.wallT, -(entryW * 0.5), baseY + HOUSE.wallH, halfD, "wallS_L");
-
-        boxMesh((entryW * 0.5 + sideW * 0.5), baseY, halfD - HOUSE.wallT * 0.5, sideW, HOUSE.wallH, HOUSE.wallT, matWall);
-        addAABB(solids, entryW * 0.5, baseY, halfD - HOUSE.wallT, entryW * 0.5 + sideW, baseY + HOUSE.wallH, halfD, "wallS_R");
+      if (frontDoor) {
+        boxMesh(-(doorW * 0.5 + sideW * 0.5), baseY, halfD - t * 0.5, sideW, HOUSE.wallH, t, matWall);
+        boxMesh((doorW * 0.5 + sideW * 0.5), baseY, halfD - t * 0.5, sideW, HOUSE.wallH, t, matWall);
+        addAABB(solids, -halfW, baseY, halfD - t, -doorW * 0.5, baseY + HOUSE.wallH, halfD, "southWallLeft");
+        addAABB(solids, doorW * 0.5, baseY, halfD - t, halfW, baseY + HOUSE.wallH, halfD, "southWallRight");
       } else {
-        boxMesh(0, baseY, halfD - HOUSE.wallT * 0.5, HOUSE.width, HOUSE.wallH, HOUSE.wallT, matWall);
-        addAABB(solids, -halfW, baseY, halfD - HOUSE.wallT, halfW, baseY + HOUSE.wallH, halfD, "wallS");
+        boxMesh(0, baseY, halfD - t * 0.5, HOUSE.width, HOUSE.wallH, t, matWall);
+        addAABB(solids, -halfW, baseY, halfD - t, halfW, baseY + HOUSE.wallH, halfD, "southWall");
       }
     }
 
-    for (let s = 0; s < HOUSE.stories; s++) exteriorWallsForStory(floorY[s], s === 0);
+    for (let s = 0; s < HOUSE.stories; s++) outerShell(floorY[s], s === 0);
 
-    boxMesh(0, -0.3, halfD + 6, 30, 0.6, 10, matStone);
+    boxMesh(0, -0.3, halfD + 6, 30, 0.6, 10, matStone, false, true);
 
     function ceilingWithHole(y, hole) {
       addCeilAABB(ceilings, -halfW, y + 0.25, -halfD, halfW, y + 2.0, halfD, "ceiling");
 
       if (!hole) {
-        const full = new THREE.Mesh(new THREE.BoxGeometry(HOUSE.width, 1.0, HOUSE.depth), matCeil);
-        full.position.set(0, y + 0.5, 0);
-        full.receiveShadow = true;
-        scene.add(full);
+        boxMesh(0, y, 0, HOUSE.width, 1.0, HOUSE.depth, matCeil, false, true);
         return;
       }
 
@@ -144,33 +155,31 @@ window.Buildings = (() => {
         y + 0.15,
         hole.z - hole.d * 0.5,
         hole.x + hole.w * 0.5,
-        y + 2.4,
+        y + 2.45,
         hole.z + hole.d * 0.5,
-        "stair_hole"
+        "stairHole"
       );
 
-      const northDepth = Math.max(0.1, (hole.z - hole.d * 0.5) - (-halfD));
-      const southDepth = Math.max(0.1, halfD - (hole.z + hole.d * 0.5));
-      const westWidth = Math.max(0.1, (hole.x - hole.w * 0.5) - (-halfW));
-      const eastWidth = Math.max(0.1, halfW - (hole.x + hole.w * 0.5));
+      const northDepth = Math.max(0.2, (hole.z - hole.d * 0.5) - (-halfD));
+      const southDepth = Math.max(0.2, halfD - (hole.z + hole.d * 0.5));
+      const westWidth = Math.max(0.2, (hole.x - hole.w * 0.5) - (-halfW));
+      const eastWidth = Math.max(0.2, halfW - (hole.x + hole.w * 0.5));
 
-      if (northDepth > 0.12) boxMesh(0, y, (-halfD + (hole.z - hole.d * 0.5)) * 0.5, HOUSE.width, 1.0, northDepth, matCeil, false, true);
-      if (southDepth > 0.12) boxMesh(0, y, (halfD + (hole.z + hole.d * 0.5)) * 0.5, HOUSE.width, 1.0, southDepth, matCeil, false, true);
-      if (westWidth > 0.12) boxMesh((-halfW + (hole.x - hole.w * 0.5)) * 0.5, y, hole.z, westWidth, 1.0, hole.d, matCeil, false, true);
-      if (eastWidth > 0.12) boxMesh((halfW + (hole.x + hole.w * 0.5)) * 0.5, y, hole.z, eastWidth, 1.0, hole.d, matCeil, false, true);
+      boxMesh(0, y, (-halfD + (hole.z - hole.d * 0.5)) * 0.5, HOUSE.width, 1.0, northDepth, matCeil, false, true);
+      boxMesh(0, y, (halfD + (hole.z + hole.d * 0.5)) * 0.5, HOUSE.width, 1.0, southDepth, matCeil, false, true);
+      boxMesh((-halfW + (hole.x - hole.w * 0.5)) * 0.5, y, hole.z, westWidth, 1.0, hole.d, matCeil, false, true);
+      boxMesh((halfW + (hole.x + hole.w * 0.5)) * 0.5, y, hole.z, eastWidth, 1.0, hole.d, matCeil, false, true);
 
-      const frameThick = 0.25;
-      boxMesh(hole.x, y, hole.z - hole.d * 0.5 - frameThick * 0.5, hole.w + 1.0, 0.22, frameThick, matTrim, false, true);
-      boxMesh(hole.x, y, hole.z + hole.d * 0.5 + frameThick * 0.5, hole.w + 1.0, 0.22, frameThick, matTrim, false, true);
-      boxMesh(hole.x - hole.w * 0.5 - frameThick * 0.5, y, hole.z, frameThick, 0.22, hole.d + 1.0, matTrim, false, true);
-      boxMesh(hole.x + hole.w * 0.5 + frameThick * 0.5, y, hole.z, frameThick, 0.22, hole.d + 1.0, matTrim, false, true);
+      const frame = 0.24;
+      boxMesh(hole.x, y, hole.z - hole.d * 0.5 - frame * 0.5, hole.w + 1.0, 0.22, frame, matTrim, false, true);
+      boxMesh(hole.x, y, hole.z + hole.d * 0.5 + frame * 0.5, hole.w + 1.0, 0.22, frame, matTrim, false, true);
+      boxMesh(hole.x - hole.w * 0.5 - frame * 0.5, y, hole.z, frame, 0.22, hole.d + 1.0, matTrim, false, true);
+      boxMesh(hole.x + hole.w * 0.5 + frame * 0.5, y, hole.z, frame, 0.22, hole.d + 1.0, matTrim, false, true);
     }
 
-    const stairA = { x: 10.5, z: 2.0, w: 8.2, d: 14.0 };
-    const stairB = { x: 10.5, z: 2.0, w: 8.2, d: 14.0 };
-
-    ceilingWithHole(HOUSE.wallH + floorY[0], stairA);
-    ceilingWithHole(HOUSE.wallH + floorY[1], stairB);
+    const stairHole = { x: stair.x, z: stair.z, w: stair.width + 1.4, d: stair.depth + 1.2 };
+    ceilingWithHole(HOUSE.wallH + floorY[0], stairHole);
+    ceilingWithHole(HOUSE.wallH + floorY[1], stairHole);
     ceilingWithHole(HOUSE.wallH + floorY[2], null);
 
     function wallZ(x, y, zCenter, length, thickness, tag) {
@@ -183,110 +192,77 @@ window.Buildings = (() => {
       addAABB(solids, xCenter - length * 0.5, y, z - thickness * 0.5, xCenter + length * 0.5, y + HOUSE.wallH, z + thickness * 0.5, tag);
     }
 
-    function wallZWithDoors(x, y, zCenter, totalLen, thickness, doors, tag) {
-      const list = (doors || []).slice().sort((a, b) => a.z - b.z);
-      const half = totalLen * 0.5;
-      const start = zCenter - half;
-      const end = zCenter + half;
-      let cur = start;
-
-      for (const d of list) {
-        const a = Math.max(start, d.z - d.w * 0.5);
-        const b = Math.min(end, d.z + d.w * 0.5);
-        const lenA = a - cur;
-        if (lenA > 0.8) wallZ(x, y, cur + lenA * 0.5, lenA, thickness, tag + "_seg");
-        cur = Math.max(cur, b);
+    function splitWallZ(x, y, z0, z1, openings, tag) {
+      const sorted = (openings || []).slice().sort((a, b) => a.min - b.min);
+      let cur = z0;
+      for (const open of sorted) {
+        if (open.min > cur) wallZ(x, y, (cur + open.min) * 0.5, open.min - cur, t, `${tag}_seg`);
+        cur = Math.max(cur, open.max);
       }
-      const lenB = end - cur;
-      if (lenB > 0.8) wallZ(x, y, cur + lenB * 0.5, lenB, thickness, tag + "_seg");
+      if (z1 > cur) wallZ(x, y, (cur + z1) * 0.5, z1 - cur, t, `${tag}_seg`);
     }
 
-    function wallXWithDoors(xCenter, y, z, totalLen, thickness, doors, tag) {
-      const list = (doors || []).slice().sort((a, b) => a.x - b.x);
-      const half = totalLen * 0.5;
-      const start = xCenter - half;
-      const end = xCenter + half;
-      let cur = start;
-
-      for (const d of list) {
-        const a = Math.max(start, d.x - d.w * 0.5);
-        const b = Math.min(end, d.x + d.w * 0.5);
-        const lenA = a - cur;
-        if (lenA > 0.8) wallX(cur + lenA * 0.5, y, z, lenA, thickness, tag + "_seg");
-        cur = Math.max(cur, b);
+    function splitWallX(y, z, x0, x1, openings, tag) {
+      const sorted = (openings || []).slice().sort((a, b) => a.min - b.min);
+      let cur = x0;
+      for (const open of sorted) {
+        if (open.min > cur) wallX((cur + open.min) * 0.5, y, z, open.min - cur, t, `${tag}_seg`);
+        cur = Math.max(cur, open.max);
       }
-      const lenB = end - cur;
-      if (lenB > 0.8) wallX(cur + lenB * 0.5, y, z, lenB, thickness, tag + "_seg");
+      if (x1 > cur) wallX((cur + x1) * 0.5, y, z, x1 - cur, t, `${tag}_seg`);
     }
 
-    const t = HOUSE.wallT;
-    const doorW = 4.6;
-    const hallX0 = -4.6;
-    const hallX1 = 4.6;
-    const innerZ0 = -halfD + 3.2;
-    const innerZ1 = halfD - 3.2;
-    const innerZCenter = (innerZ0 + innerZ1) * 0.5;
-    const innerZLen = innerZ1 - innerZ0;
-    const westSplit1 = 12;
-    const westSplit2 = -4;
-    const eastSplit1 = 10;
-    const eastSplit2 = -6;
-    const eastMidX = 16;
+    function buildInterior(story) {
+      const by = floorY[story];
 
-    for (let s = 0; s < HOUSE.stories; s++) {
-      const by = floorY[s];
+      splitWallZ(hall.minX, by, hall.minZ, hall.maxZ, [
+        { min: 16, max: 21 },
+        { min: -3, max: 2 },
+        { min: -19, max: -14 }
+      ], `hallLeft_${story}`);
 
-      wallZWithDoors(hallX0, by, innerZCenter, innerZLen, t, [
-        { z: 18, w: doorW },
-        { z: 4, w: doorW },
-        { z: -8, w: doorW },
-        { z: -18, w: doorW },
-      ], `hall_w_${s}`);
+      splitWallZ(hall.maxX, by, hall.minZ, hall.maxZ, [
+        { min: 15, max: 20 },
+        { min: -3, max: 2 },
+        { min: -17, max: -12 }
+      ], `hallRight_${story}`);
 
-      wallZWithDoors(hallX1, by, innerZCenter, innerZLen, t, [
-        { z: 18, w: doorW },
-        { z: 6, w: doorW },
-        { z: -14, w: doorW },
-      ], `hall_e_${s}`);
+      splitWallX(by, 12, -halfW + t, hall.minX, [{ min: -27, max: -22 }], `westSouth_${story}`);
+      splitWallX(by, -6, -halfW + t, hall.minX, [{ min: -27, max: -22 }], `westNorth_${story}`);
 
-      const westLen = hallX0 - (-halfW + t);
-      wallXWithDoors((-halfW + t + hallX0) * 0.5, by, westSplit1, westLen, t, [{ x: -24, w: doorW }], `west_split1_${s}`);
-      wallXWithDoors((-halfW + t + hallX0) * 0.5, by, westSplit2, westLen, t, [{ x: -24, w: doorW }], `west_split2_${s}`);
+      splitWallX(by, 10, hall.maxX, halfW - t, [{ min: 24, max: 29 }], `eastSouth_${story}`);
+      splitWallX(by, -7, hall.maxX, halfW - t, [{ min: 24, max: 29 }], `eastNorth_${story}`);
 
-      const eastLen = (halfW - t) - hallX1;
-      wallXWithDoors((hallX1 + halfW - t) * 0.5, by, eastSplit1, eastLen, t, [{ x: 24, w: doorW }], `east_split1_${s}`);
-      wallXWithDoors((hallX1 + halfW - t) * 0.5, by, eastSplit2, eastLen, t, [{ x: 24, w: doorW }], `east_split2_${s}`);
+      splitWallZ(26, by, -7, 10, [{ min: 0, max: 5 }], `eastMid_${story}`);
 
-      wallZWithDoors(eastMidX, by, 2, eastSplit1 - eastSplit2, t, [{ z: 2, w: doorW }], `east_mid_${s}`);
+      // Stairwell enclosure with clear hall access.
+      splitWallZ(12.7, by, -5.5, 9.5, [{ min: -1.6, max: 3.1 }], `stairWest_${story}`);
+      splitWallZ(22.3, by, -5.5, 9.5, [{ min: 2.4, max: 7.0 }], `stairEast_${story}`);
+      splitWallX(by, -5.5, 12.7, 22.3, [{ min: 16.0, max: 19.0 }], `stairNorth_${story}`);
+      if (story !== 0) splitWallX(by, 9.5, 12.7, 22.3, [{ min: 16.0, max: 19.0 }], `stairSouth_${story}`);
     }
 
-    const doorMat = new THREE.MeshStandardMaterial({ map: tex.door, roughness: 0.95 });
+    for (let s = 0; s < HOUSE.stories; s++) buildInterior(s);
+
+    const doorMat = new THREE.MeshStandardMaterial({ map: tex.door, roughness: 0.95, side: THREE.DoubleSide });
     const glassMat = new THREE.MeshStandardMaterial({
       map: tex.windowGlass,
       transparent: true,
-      opacity: 0.7,
-      roughness: 0.2
+      opacity: 0.72,
+      roughness: 0.18,
+      side: THREE.DoubleSide
     });
 
     function doorAt(x, y, z, rotY) {
-      const d = new THREE.Mesh(new THREE.PlaneGeometry(3.0, 6.0), doorMat);
-      d.position.set(x, y + 3.0, z);
-      d.rotation.y = rotY;
-      d.material.side = THREE.DoubleSide;
-      d.castShadow = true;
-      d.receiveShadow = true;
-      scene.add(d);
+      planeMesh(3.0, 6.0, x, y + 3.0, z, rotY, doorMat);
     }
 
     function windowAt(x, y, z, rotY) {
-      const w = new THREE.Mesh(new THREE.PlaneGeometry(6.2, 3.4), glassMat);
-      w.position.set(x, y + 5.4, z);
-      w.rotation.y = rotY;
-      w.material.side = THREE.DoubleSide;
-      scene.add(w);
-
-      const trim = new THREE.Mesh(new THREE.BoxGeometry(6.6, 3.8, 0.2), matTrim);
-      trim.position.set(x, y + 5.4, z + (Math.abs(rotY) < 0.01 ? -0.1 : (Math.abs(rotY - Math.PI) < 0.01 ? 0.1 : 0)));
+      planeMesh(6.2, 3.4, x, y + 5.4, z, rotY, glassMat);
+      const trimDepth = 0.2;
+      const offsetZ = Math.abs(rotY) < 0.01 ? -0.1 : (Math.abs(rotY - Math.PI) < 0.01 ? 0.1 : 0);
+      const trim = new THREE.Mesh(new THREE.BoxGeometry(6.6, 3.8, trimDepth), matTrim);
+      trim.position.set(x, y + 5.4, z + offsetZ);
       trim.rotation.y = rotY;
       trim.castShadow = true;
       trim.receiveShadow = true;
@@ -294,30 +270,29 @@ window.Buildings = (() => {
     }
 
     doorAt(0, 0, halfD - 0.9, Math.PI);
-
     for (let s = 0; s < HOUSE.stories; s++) {
-      const by = s * HOUSE.floorHeight;
-      windowAt(-halfW + 0.9, by, -12, Math.PI / 2);
-      windowAt(-halfW + 0.9, by, 12, Math.PI / 2);
-      windowAt(halfW - 0.9, by, -12, -Math.PI / 2);
-      windowAt(halfW - 0.9, by, 12, -Math.PI / 2);
-      windowAt(-10, by, -halfD + 0.9, 0);
-      windowAt(10, by, -halfD + 0.9, 0);
+      const by = floorY[s];
+      windowAt(-halfW + 0.9, by, -16, Math.PI * 0.5);
+      windowAt(-halfW + 0.9, by, 16, Math.PI * 0.5);
+      windowAt(halfW - 0.9, by, -16, -Math.PI * 0.5);
+      windowAt(halfW - 0.9, by, 16, -Math.PI * 0.5);
+      windowAt(-14, by, -halfD + 0.9, 0);
+      windowAt(14, by, -halfD + 0.9, 0);
       windowAt(-14, by, halfD - 0.9, Math.PI);
       windowAt(14, by, halfD - 0.9, Math.PI);
     }
 
-    function makeStairRamp(cx, cz, fromStory, toStory, hole) {
+    function makeStairRamp(cx, cz, fromStory, toStory) {
       const yBase = floorY[fromStory];
       const yTop = floorY[toStory];
-      const run = 12.4;
-      const width = 6.2;
+      const run = 12.2;
+      const width = 5.8;
       const stepCount = 18;
       const rise = (yTop - yBase) / stepCount;
       const tread = run / stepCount;
-      const stairMat = new THREE.MeshStandardMaterial({ color: 0x7a6f63, roughness: 0.9 });
+      const stairMat = new THREE.MeshStandardMaterial({ color: 0x7a6f63, roughness: 0.88 });
 
-      const zStart = cz + 4.9;
+      const zStart = cz + 4.8;
       for (let i = 0; i < stepCount; i++) {
         const h = Math.max(0.10, rise * 0.95);
         const y = yBase + i * rise;
@@ -331,21 +306,14 @@ window.Buildings = (() => {
 
       addRamp(ramps, cx, zStart, cx, zStart - run, yBase + 0.02, yTop + 0.02, width, `ramp_${fromStory}_${toStory}`);
 
-      const railHeight = yBase + 1.0;
-      addAABB(solids, cx - width * 0.5 - 0.24, railHeight, zStart - run + 0.3, cx - width * 0.5 - 0.02, yTop + 0.9, zStart + 0.7, "railL");
-      addAABB(solids, cx + width * 0.5 + 0.02, railHeight, zStart - run + 0.3, cx + width * 0.5 + 0.24, yTop + 0.9, zStart + 0.7, "railR");
-
-      boxMesh(cx, yTop, zStart - run + 0.75, width + 1.4, 0.42, 5.6, matStone);
-
-      if (hole) {
-        addAABB(solids, hole.x - hole.w * 0.5, yBase, hole.z - hole.d * 0.5, hole.x - hole.w * 0.5 + 0.28, yBase + 1.0, hole.z + hole.d * 0.5, "holeRailW");
-        addAABB(solids, hole.x + hole.w * 0.5 - 0.28, yBase, hole.z - hole.d * 0.5, hole.x + hole.w * 0.5, yBase + 1.0, hole.z + hole.d * 0.5, "holeRailE");
-        addAABB(solids, hole.x - hole.w * 0.5 + 0.3, yBase, hole.z + hole.d * 0.5 - 0.28, hole.x + hole.w * 0.5 - 0.3, yBase + 1.0, hole.z + hole.d * 0.5, "holeRailS");
-      }
+      const railBase = yBase + 1.0;
+      addAABB(solids, cx - width * 0.5 - 0.24, railBase, zStart - run + 0.5, cx - width * 0.5 - 0.04, yTop + 0.85, zStart + 0.8, "stairRailL");
+      addAABB(solids, cx + width * 0.5 + 0.04, railBase, zStart - run + 0.5, cx + width * 0.5 + 0.24, yTop + 0.85, zStart + 0.8, "stairRailR");
+      boxMesh(cx, yTop, zStart - run + 0.75, width + 1.2, 0.40, 5.0, matStone);
     }
 
-    makeStairRamp(stairA.x, stairA.z, 0, 1, stairA);
-    makeStairRamp(stairB.x, stairB.z, 1, 2, stairB);
+    makeStairRamp(stair.x, stair.z, 0, 1);
+    makeStairRamp(stair.x, stair.z, 1, 2);
 
     function couch(x, y, z, rotY) {
       const group = new THREE.Group();
@@ -355,23 +323,16 @@ window.Buildings = (() => {
       back.position.set(0, 0.78, -0.54);
       const armGeo = new THREE.BoxGeometry(0.22, 0.85, 1.25);
       const armL = new THREE.Mesh(armGeo, matFabric);
+      const armR = new THREE.Mesh(armGeo, matFabric);
       armL.position.set(-1.44, 0.43, 0);
-      const armR = armL.clone();
-      armR.position.x = 1.44;
-      const legs = [
-        [-1.2, 0.1, -0.42], [1.2, 0.1, -0.42], [-1.2, 0.1, 0.42], [1.2, 0.1, 0.42]
-      ];
-      for (const part of [base, back, armL, armR]) {
-        part.castShadow = true;
-        part.receiveShadow = true;
-        group.add(part);
+      armR.position.set(1.44, 0.43, 0);
+      group.add(base, back, armL, armR);
+      for (const p of [[-1.2, 0.1, -0.42], [1.2, 0.1, -0.42], [-1.2, 0.1, 0.42], [1.2, 0.1, 0.42]]) {
+        const leg = new THREE.Mesh(new THREE.BoxGeometry(0.14, 0.2, 0.14), matDarkWood);
+        leg.position.set(p[0], p[1], p[2]);
+        group.add(leg);
       }
-      for (const leg of legs) {
-        const m = new THREE.Mesh(new THREE.BoxGeometry(0.14, 0.2, 0.14), matDarkWood);
-        m.position.set(leg[0], leg[1], leg[2]);
-        m.castShadow = true;
-        group.add(m);
-      }
+      group.traverse(obj => { if (obj.isMesh) { obj.castShadow = true; obj.receiveShadow = true; } });
       group.position.set(x, y, z);
       group.rotation.y = rotY || 0;
       scene.add(group);
@@ -383,8 +344,7 @@ window.Buildings = (() => {
       const top = new THREE.Mesh(new THREE.BoxGeometry(2.0, 0.18, 1.25), matWood);
       top.position.set(0, 0.84, 0);
       group.add(top);
-      const legPos = [[-0.78, 0.38, -0.44], [0.78, 0.38, -0.44], [-0.78, 0.38, 0.44], [0.78, 0.38, 0.44]];
-      for (const p of legPos) {
+      for (const p of [[-0.78, 0.38, -0.44], [0.78, 0.38, -0.44], [-0.78, 0.38, 0.44], [0.78, 0.38, 0.44]]) {
         const leg = new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.76, 0.16), matDarkWood);
         leg.position.set(p[0], p[1], p[2]);
         group.add(leg);
@@ -433,54 +393,61 @@ window.Buildings = (() => {
     }
 
     function tvScreen(x, y, z, rotY) {
-      const screenGeo = new THREE.PlaneGeometry(8.2, 4.6);
-      const screenMat = new THREE.MeshStandardMaterial({
+      const mat = new THREE.MeshStandardMaterial({
         map: tex.tvScreen,
         emissive: new THREE.Color(0x202040),
-        emissiveIntensity: 0.75,
-        roughness: 0.35
+        emissiveIntensity: 0.72,
+        roughness: 0.35,
+        side: THREE.DoubleSide
       });
-      const s = new THREE.Mesh(screenGeo, screenMat);
-      s.position.set(x, y + 4.0, z);
-      s.rotation.y = rotY;
-      scene.add(s);
+      planeMesh(8.2, 4.6, x, y + 4.0, z, rotY, mat);
     }
 
-    couch(-24, floorY[0], 24.1, Math.PI);
-    table(-24, floorY[0], 18.2, 0);
+    // Floor 1: foyer, living room, dining room, kitchen, stair hall.
+    couch(-24.0, floorY[0], 23.8, Math.PI);
+    table(-24.0, floorY[0], 18.0, 0);
     bookshelf(-37.0, floorY[0], 19.0, Math.PI * 0.5);
-    counter(-28, floorY[0], -20.5, 0);
-    lamp(-17.0, floorY[0], 22.0);
+    lamp(-17.2, floorY[0], 22.2);
+    tvScreen(-24.0, floorY[0], 12.55, 0);
+    counter(-30.0, floorY[0], -19.5, 0);
+    table(-24.0, floorY[0], -20.0, 0);
+    bookshelf(38.0, floorY[0], -18.0, -Math.PI * 0.5);
 
-    bookshelf(-37.0, floorY[1], 16.0, Math.PI * 0.5);
-    couch(24.0, floorY[1], 24.0, Math.PI);
-    table(24.0, floorY[1], 18.4, 0);
+    // Floor 2: family room west, bedroom south-east, office north-east.
+    couch(-24.0, floorY[1], 23.8, Math.PI);
+    table(-24.0, floorY[1], 18.0, 0);
+    tvScreen(-24.0, floorY[1], 12.55, 0);
+    bookshelf(-37.0, floorY[1], 18.0, Math.PI * 0.5);
+    couch(24.0, floorY[1], 23.8, Math.PI);
+    table(24.0, floorY[1], 18.0, 0);
     lamp(17.5, floorY[1], 22.0);
+    bookshelf(38.0, floorY[1], -18.0, -Math.PI * 0.5);
 
-    couch(-24.0, floorY[2], -24.0, 0);
-    table(-24.0, floorY[2], -18.2, 0);
+    // Floor 3: attic lounge west, study north-east.
+    couch(-24.0, floorY[2], -23.8, 0);
+    table(-24.0, floorY[2], -18.0, 0);
+    tvScreen(-24.0, floorY[2], -12.55, Math.PI);
     bookshelf(-37.0, floorY[2], -18.0, Math.PI * 0.5);
     lamp(-17.5, floorY[2], -22.0);
-
-    tvScreen(-24.0, floorY[0], 12.55, 0);
-    tvScreen(24.0, floorY[1], 10.55, 0);
-    tvScreen(-24.0, floorY[2], -12.55, Math.PI);
+    bookshelf(38.0, floorY[2], -18.0, -Math.PI * 0.5);
+    table(24.0, floorY[2], -18.0, 0);
 
     function addSpawn(x, z, story, w = 1.0) {
       spawnPoints.push({ x, z, story, w });
     }
 
     for (let s = 0; s < HOUSE.stories; s++) {
-      addSpawn(0, 14, s, 1.5);
-      addSpawn(0, 0, s, 1.5);
-      addSpawn(0, -14, s, 1.5);
-      addSpawn(-24, 20, s, 1.0);
-      addSpawn(-24, 6, s, 1.0);
-      addSpawn(-24, -18, s, 1.0);
-      addSpawn(24, 20, s, 1.0);
-      addSpawn(10, 6, s, 1.0);
-      addSpawn(26, 2, s, 1.0);
-      addSpawn(24, -18, s, 1.0);
+      addSpawn(0, 20, s, 1.4);
+      addSpawn(0, 2, s, 1.4);
+      addSpawn(0, -18, s, 1.4);
+
+      addSpawn(-24, 22, s, 1.1);
+      addSpawn(-24, -18, s, 1.1);
+
+      addSpawn(24, 22, s, 1.1);
+      addSpawn(24, -18, s, 1.1);
+
+      addSpawn(33, 0, s, 0.9);
     }
 
     return { HOUSE, solids, ceilings, ramps, holes, bounds, floorY, spawnPoints };
