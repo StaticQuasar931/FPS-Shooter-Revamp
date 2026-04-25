@@ -48,7 +48,7 @@
 
     const keys = { w:false, a:false, s:false, d:false, shift:false, space:false };
 
-    function bindKeys(onShop, onReload, onPause) {
+    function bindKeys(onShop, onReload, onPause, onMelee) {
       document.addEventListener("keydown", (e) => {
         if (e.code === "KeyW") keys.w = true;
         if (e.code === "KeyA") keys.a = true;
@@ -60,6 +60,7 @@
         if (e.code === "KeyF") onShop && onShop();
         if (e.code === "KeyR") onReload && onReload();
         if (e.code === "Escape") onPause && onPause();
+        if (e.code === "KeyV") onMelee && onMelee();
       }, { passive: false });
 
       document.addEventListener("keyup", (e) => {
@@ -114,16 +115,19 @@
 
     function updateRecoil(dt) {
       if (state.recoilPitch > 0) {
-        const pitchStep = Math.min(state.recoilPitch, dt * 7.5);
+        const pitchStep = Math.min(state.recoilPitch, dt * 6.2);
         pitchObject.rotation.x = clamp(pitchObject.rotation.x - pitchStep, -Math.PI * 0.48, Math.PI * 0.48);
         state.recoilPitch -= pitchStep;
       }
 
       state.recoilYaw = 0;
+      if (camera && camera.rotation) camera.rotation.z = 0;
+      if (pitchObject && pitchObject.rotation) pitchObject.rotation.z = 0;
+      if (yawObject && yawObject.rotation) yawObject.rotation.z = 0;
     }
 
     function applyRecoil(pitchAmount, yawAmount) {
-      state.recoilPitch = Math.min(0.12, state.recoilPitch + Math.max(0, pitchAmount || 0));
+      state.recoilPitch = Math.min(0.085, state.recoilPitch + Math.max(0, pitchAmount || 0));
       state.recoilYaw = 0;
     }
 
@@ -232,6 +236,9 @@
     function resetLook() {
       if (yawObject && yawObject.rotation) yawObject.rotation.y = 0;
       if (pitchObject && pitchObject.rotation) pitchObject.rotation.x = 0;
+      if (camera && camera.rotation) camera.rotation.z = 0;
+      if (pitchObject && pitchObject.rotation) pitchObject.rotation.z = 0;
+      if (yawObject && yawObject.rotation) yawObject.rotation.z = 0;
       state.recoilPitch = 0;
       state.recoilYaw = 0;
     }

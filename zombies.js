@@ -322,10 +322,10 @@
     }
 
     function applyFlash(zObj, intensity) {
-      const glow = clamp(intensity, 0, 1) * 0.85;
+      const glow = clamp(intensity, 0, 1) * 1.15;
       for (const part of zObj.parts) {
         if (!part.material || !part.material.emissive) continue;
-        part.material.emissive.setRGB(glow, glow * 0.95, glow * 0.95);
+        part.material.emissive.setRGB(glow, glow * 0.92, glow * 0.92);
       }
     }
 
@@ -348,6 +348,7 @@
         new THREE.SphereGeometry(0.12, 8, 8),
         new THREE.MeshBasicMaterial({ color: 0xa3ff7c, transparent: true, opacity: 0.95 })
       );
+      mesh.scale.set(1.35, 1.35, 1.35);
       mesh.visible = false;
       scene.add(mesh);
 
@@ -426,7 +427,7 @@
       if (!best) return { hit:false, blocked: !!wallHit };
 
       best.hp -= dmg;
-      best.flashT = 0.09;
+      best.flashT = 0.12;
       applyFlash(best, 1);
 
       let killed = false;

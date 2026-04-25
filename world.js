@@ -31,14 +31,7 @@ window.World = (() => {
 
     const b = Buildings.build(scene, tex);
 
-    const roomLights = [
-      [-24, b.floorY[0] + 3.8, 18, 0xffd7a8, 0.30],
-      [24, b.floorY[0] + 3.8, 8, 0xffe5bb, 0.24],
-      [-24, b.floorY[1] + 3.8, 16, 0xfff0c8, 0.22],
-      [10, b.floorY[1] + 3.8, 3, 0xffddb2, 0.20],
-      [-24, b.floorY[2] + 3.8, 10, 0xffefcf, 0.18],
-    ];
-    for (const [x, y, z, color, intensity] of roomLights) {
+    for (const [x, y, z, color, intensity] of (b.roomLights || [])) {
       const point = new THREE.PointLight(color, intensity, 18, 2);
       point.position.set(x, y, z);
       scene.add(point);

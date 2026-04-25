@@ -42,10 +42,14 @@
 
     weaponCard: document.getElementById("weaponCard"),
     crosshair: document.getElementById("crosshair"),
+    hitMarker: document.getElementById("hitMarker"),
+    damageFlash: document.getElementById("damageFlash"),
   };
 
   let waveMsgTimer = null;
   let kickTimer = null;
+  let hitMarkerTimer = null;
+  let damageTimer = null;
 
   function showStart(v) {
     if (!el.startOverlay) return;
@@ -85,24 +89,60 @@
   function flashCrosshair(kind) {
     if (!el.crosshair) return;
     const prev = el.crosshair.style.filter;
+    const prevTransform = el.crosshair.style.transform;
 
     if (kind === "hit") {
       el.crosshair.style.filter = "drop-shadow(0 0 10px rgba(255,255,255,0.95))";
+      el.crosshair.style.transform = "translate(-50%,-50%) scale(1.08)";
     } else if (kind === "kill") {
       el.crosshair.style.filter = "drop-shadow(0 0 12px rgba(120,255,220,0.98))";
+      el.crosshair.style.transform = "translate(-50%,-50%) scale(1.15)";
     } else if (kind === "damage") {
       el.crosshair.style.filter = "drop-shadow(0 0 12px rgba(255,120,120,0.98))";
+      el.crosshair.style.transform = "translate(-50%,-50%) scale(1.12)";
     } else {
       el.crosshair.style.filter = "drop-shadow(0 0 8px rgba(255,255,255,0.75))";
+      el.crosshair.style.transform = "translate(-50%,-50%) scale(1)";
     }
 
     setTimeout(() => {
-      if (el.crosshair) el.crosshair.style.filter = prev || "";
+      if (el.crosshair) {
+        el.crosshair.style.filter = prev || "";
+        el.crosshair.style.transform = prevTransform || "translate(-50%,-50%)";
+      }
     }, 90);
+  }
+
+  function flashHitMarker(kind) {
+    if (!el.hitMarker) return;
+    if (hitMarkerTimer) clearTimeout(hitMarkerTimer);
+
+    el.hitMarker.style.opacity = "1";
+    el.hitMarker.style.transform = "translate(-50%,-50%) scale(1)";
+    el.hitMarker.style.filter =
+      kind === "kill"
+        ? "drop-shadow(0 0 12px rgba(120,255,220,0.95))"
+        : "drop-shadow(0 0 12px rgba(255,255,255,0.92))";
+    el.hitMarker.classList.add("show");
+
+    hitMarkerTimer = setTimeout(() => {
+      if (!el.hitMarker) return;
+      el.hitMarker.classList.remove("show");
+      el.hitMarker.style.opacity = "";
+      el.hitMarker.style.transform = "";
+      el.hitMarker.style.filter = "";
+    }, kind === "kill" ? 120 : 90);
   }
 
   function flashDamage() {
     flashCrosshair("damage");
+    if (el.damageFlash) {
+      el.damageFlash.style.opacity = "1";
+      if (damageTimer) clearTimeout(damageTimer);
+      damageTimer = setTimeout(() => {
+        if (el.damageFlash) el.damageFlash.style.opacity = "0";
+      }, 140);
+    }
     setWaveMsg("You got hit!", 450);
   }
 
@@ -121,8 +161,14 @@
     if (!el.weaponCard) return;
     if (kickTimer) clearTimeout(kickTimer);
     el.weaponCard.classList.add("kick");
+    if (el.uiWeaponArt) {
+      el.uiWeaponArt.style.transform = "translate(6px, 14px) rotate(-3deg)";
+    }
     kickTimer = setTimeout(() => {
       if (el.weaponCard) el.weaponCard.classList.remove("kick");
+      if (el.uiWeaponArt) {
+        el.uiWeaponArt.style.transform = "translate(0, 8px) rotate(-8deg)";
+      }
     }, 90);
   }
 
@@ -195,6 +241,7 @@
     kickGun,
     updateHUD,
     flashCrosshair,
+    flashHitMarker,
     flashDamage,
   };
 })();

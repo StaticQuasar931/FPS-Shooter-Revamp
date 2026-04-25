@@ -84,6 +84,11 @@
         weapons: {},
         weapon: null,
         upgrades: null,
+        melee: {
+          cooldown: 0,
+          range: 2.25,
+          damage: 28,
+        },
 
         fx: null,
 
@@ -212,6 +217,8 @@
         return {
           unlock: () => ensure(),
           shot: () => { noiseBurst(0.05, 0.015, 900); beep(180, 0.045, "triangle", 0.012, 120); },
+          melee: () => { noiseBurst(0.04, 0.012, 750); beep(150, 0.035, "triangle", 0.010, 95); },
+          dry: () => { beep(430, 0.02, "square", 0.005, 320); },
           reload: () => { beep(460, 0.03, "sine", 0.012, 380); beep(620, 0.04, "sine", 0.012, 520, 0.04); },
           hit: () => { noiseBurst(0.03, 0.01, 1500); beep(360, 0.03, "triangle", 0.008, 240); },
           kill: () => { beep(280, 0.04, "triangle", 0.011, 400); beep(500, 0.06, "triangle", 0.010, 700, 0.03); },
@@ -246,12 +253,12 @@
 
         function makeFlash() {
           const mesh = new THREE.Mesh(
-            new THREE.PlaneGeometry(1, 1),
+            new THREE.SphereGeometry(0.5, 10, 8),
             new THREE.MeshBasicMaterial({
-              map: null,
               transparent: true,
               depthWrite: false,
               opacity: 0,
+              color: 0xffefbf,
             })
           );
           mesh.visible = false;
@@ -291,9 +298,8 @@
         }
 
         function showFlash(position, size, life) {
-          if (!game.tex || !game.tex.bulletFx) return;
           const flash = borrowFlash();
-          flash.mesh.material.map = game.tex.bulletFx;
+          flash.mesh.material.color.setHex(size > 0.8 ? 0xffd58d : 0xfff4d8);
           flash.mesh.material.opacity = 1;
           flash.mesh.scale.set(size, size, size);
           flash.mesh.position.copy(position);
@@ -320,7 +326,6 @@
             }
             flash.life = Math.max(0, flash.life - dt);
             flash.mesh.material.opacity = (flash.maxLife > 0) ? (flash.life / flash.maxLife) : 0;
-            flash.mesh.quaternion.copy(camera.quaternion);
             flash.mesh.visible = flash.life > 0;
           }
         }
@@ -591,7 +596,8 @@
         if (!game.player.canFire(now, w.fireRate)) return false;
 
         if (w.ammo <= 0) {
-          game.ui.setWaveMsg("Out of ammo. Press R to reload.", 800);
+          game.ui.setWaveMsg("Out of ammo. Press R or use V to melee.", 800);
+          if (game.audio) game.audio.dry();
           return false;
         }
 
@@ -638,6 +644,7 @@
           tempHitPos.copy(bestHit.dir).multiplyScalar(bestHit.dist).add(tempOrigin);
           spawnFlash(tempHitPos, 0.75, 0.11);
           game.ui.flashCrosshair(bestHit.killed ? "kill" : "hit");
+          if (game.ui && game.ui.flashHitMarker) game.ui.flashHitMarker(bestHit.killed ? "kill" : "hit");
           if (!bestHit.killed) {
             if (game.audio) game.audio.hit();
             game.ui.setWaveMsg("HIT", 250);
@@ -657,6 +664,34 @@
         const clearBonus = 12 + waveNum * 2 + tier * 8;
         const difficulty = 1 + waveNum * 0.08;
         return { killsNeeded, spawnBudget: killsNeeded, aliveCap, spawnInterval, guaranteedTanks, rewardBonus, clearBonus, difficulty };
+      }
+
+      function performMelee() {
+        if (!game.started || game.paused || game.shopOpen) return false;
+        if (!game.player || !game.zombies) return false;
+        if (game.melee.cooldown > 0) return false;
+
+        tempOrigin.copy(game.player.getEyePosition());
+        camera.getWorldDirection(tempDir);
+        tempDir.normalize();
+
+        const hit = game.zombies.damageFromBullet(tempOrigin, tempDir, game.melee.range, game.melee.damage, game.world);
+        game.melee.cooldown = 0.42;
+
+        if (game.ui && game.ui.kickGun) game.ui.kickGun();
+        if (game.audio) game.audio.melee();
+
+        if (hit && hit.hit) {
+          if (hit.killed) onZombieKilled(hit.type || "normal");
+          game.ui.flashCrosshair(hit.killed ? "kill" : "hit");
+          if (game.ui && game.ui.flashHitMarker) game.ui.flashHitMarker(hit.killed ? "kill" : "hit");
+          if (!hit.killed && game.audio) game.audio.hit();
+          game.ui.setWaveMsg(hit.killed ? "MELEE KILL" : "MELEE HIT", 380);
+          return true;
+        }
+
+        game.ui.setWaveMsg("Melee missed", 250);
+        return false;
       }
 
       function startWave() {
@@ -899,7 +934,9 @@
           game.audio.unlock();
           if (!game.paused) tryLockCursorFromGesture();
           if (game.player && game.player.consumeTriggerPress && game.player.consumeTriggerPress()) {
-            spawnBullet();
+            if (!spawnBullet() && game.weapon && game.weapon.ammo <= 0 && game.weapon.reserve <= 0) {
+              performMelee();
+            }
           }
         });
       }
@@ -909,6 +946,7 @@
         game.paused = !startNow;
         game.shopOpen = false;
         game.gameOver = false;
+        game.melee.cooldown = 0;
 
         game.stats.kills = 0;
         game.stats.coins = 50;
@@ -975,6 +1013,10 @@
             if (!game.started) return;
             if (game.shopOpen) { closeShop(); return; }
             setPaused(!game.paused, "Paused. Click Resume to continue.");
+          },
+          () => {
+            if (!game.started || game.shopOpen || game.paused) return;
+            performMelee();
           }
         );
 
@@ -996,6 +1038,7 @@
         requestAnimationFrame(animate);
 
         const dt = Math.min(0.033, Math.max(0.001, game.clock.getDelta()));
+        game.melee.cooldown = Math.max(0, game.melee.cooldown - dt);
 
         if (game.started && !game.paused && !game.shopOpen) {
           game.player.step(dt, game.world);
